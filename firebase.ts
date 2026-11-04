@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore } from "firebase/firestore";
 
 // Config web Firebase bersifat publik (bukan rahasia). Keamanan data dijaga oleh
 // firestore.rules dan daftar Authorized domains. Env VITE_FIREBASE_* (kalau diisi)
@@ -18,4 +18,4 @@ const config = {
 const app = initializeApp(config);
 
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+export const db = initializeFirestore(app, { ignoreUndefinedProperties: true });
