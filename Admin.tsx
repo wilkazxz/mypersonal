@@ -3,6 +3,8 @@ import { Link } from "wouter";
 import { useAuth } from "./auth";
 import { useSite, useUsers, type RegisteredUser } from "./site";
 import { useRealtimeItems } from "./realtime";
+import Cropper, { dataUrlToFile } from "./Cropper";
+import { SpotlightAdmin } from "./Spotlight";
 import {
   ArrowLeft,
   Download,
@@ -26,11 +28,12 @@ import {
   Activity,
 } from "lucide-react";
 
-type Tab = "Overview" | "Content" | "Users" | "Branding";
+type Tab = "Overview" | "Content" | "Users" | "Spotlight" | "Branding";
 const TABS: Array<{ id: Tab; label: string; Icon: typeof Users }> = [
   { id: "Overview", label: "Overview", Icon: LayoutDashboard },
   { id: "Content", label: "Konten", Icon: FileArchive },
   { id: "Users", label: "User", Icon: Users },
+  { id: "Spotlight", label: "Spotlight", Icon: ImagePlus },
   { id: "Branding", label: "Ikon & nama", Icon: Palette },
 ];
 
@@ -102,6 +105,7 @@ export default function Admin() {
   const [userQuery, setUserQuery] = useState("");
   const [siteName, setSiteName] = useState<string | null>(null);
   const [iconFile, setIconFile] = useState<File | null>(null);
+  const [iconRaw, setIconRaw] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
 
@@ -452,6 +456,7 @@ export default function Admin() {
           </section>
         )}
 
+        {tab === "Spotlight" && <SpotlightAdmin />}
         {tab === "Branding" && (
           <section className="admin-panel content-panel">
             <div className="admin-panel__head">
@@ -484,11 +489,14 @@ export default function Admin() {
                   maxLength={40}
                 />
               </label>
+              {iconRaw && (
+                <Cropper file={iconRaw} outW={512} onCancel={() => setIconRaw(null)} onDone={d => { setIconFile(dataUrlToFile(d, "ikon.jpg")); setIconRaw(null); }} />
+              )}
               <label className="file-pick">
                 <span>
                   <ImagePlus size={16} /> {iconFile ? iconFile.name : "Pilih gambar ikon (persegi lebih baik)"}
                 </span>
-                <input type="file" accept="image/*" onChange={e => setIconFile(e.target.files?.[0] || null)} />
+                <input type="file" accept="image/*" onChange={e => { setIconRaw(e.target.files?.[0] || null); e.target.value = ""; }} />
               </label>
               <div className="form-actions">
                 <button className="primary-button" disabled={saving} onClick={onSave}>

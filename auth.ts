@@ -26,6 +26,10 @@ async function registerUser(u: { uid: string; displayName: string | null; email:
       },
       { merge: true }
     );
+    const pref = doc(db, "profiles", u.uid);
+    if (!(await getDoc(pref)).exists()) {
+      await setDoc(pref, { uid: u.uid, name: u.displayName || "", photo: u.photoURL || "", bio: "", updatedAt: Date.now() });
+    }
   } catch {
     /* abaikan: pencatatan user tidak boleh memblokir login */
   }

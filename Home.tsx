@@ -3,6 +3,9 @@ import { Link, useLocation } from "wouter";
 import { useAuth, authEnabled } from "./auth";
 import { useInstall, detectPlatform } from "./pwa";
 import { useSite } from "./site";
+import { useProfiles, saveProfile } from "./profiles";
+import Cropper from "./Cropper";
+import { SpotlightCarousel } from "./Spotlight";
 import type { LucideIcon } from "lucide-react";
 import { useRealtimeItems, type MediaItem } from "./realtime";
 import {
@@ -175,11 +178,16 @@ function MediaCard({
   onDelete: (id: number) => void;
   canDelete?: boolean;
 }) {
+  const profiles = useProfiles();
+  const prof = item.ownerId ? profiles[item.ownerId] : undefined;
+  const ownerName = prof?.name || item.ownerName || "Pengguna";
   return (
     <article className={`media-card media-card--${item.ratio}`}>
       <div className="post-head">
-        <span className="avatar avatar--lime">{(item.ownerName || "W").charAt(0).toUpperCase()}</span>
-        <strong>{item.ownerName || "Wilka"}</strong>
+        <span className="avatar avatar--lime">
+          {prof?.photo ? <img src={prof.photo} alt="" referrerPolicy="no-referrer" /> : ownerName.charAt(0).toUpperCase()}
+        </span>
+        <strong>{ownerName}</strong>
         <span className="post-head__time">{item.date}</span>
       </div>
       <div className="media-card__visual">
@@ -408,6 +416,8 @@ export default function Home() {
   const { user, isAdmin, loading: authLoading, signInWithGoogle, signOut } =
     useAuth();
   const { canInstall, install, helpOpen, closeHelp } = useInstall();
+  const profiles = useProfiles();
+  const myPhoto = user ? profiles[user.id]?.photo || user.avatar : undefined;
   const [sortMode, setSortMode] = useState<SortMode>("Terbaru");
   const [loginOpen, setLoginOpen] = useState(false);
   const canUpload = !authEnabled || !!user;
@@ -626,6 +636,7 @@ export default function Home() {
       </div>
 
       <main className="main-content">
+        {location === "/" && <SpotlightCarousel />}
         <header className="topbar">
           <div className="topbar__crumb">
             <span>WILKAXYZ</span>
@@ -655,7 +666,7 @@ export default function Home() {
         {location !== "/settings" && location !== "/collections" && (
           <section className="compose-row" onClick={openUpload}>
             <div className="avatar avatar--lime">
-              {user?.avatar ? <img src={user.avatar} alt="" referrerPolicy="no-referrer" /> : (user?.name?.charAt(0) || "W").toUpperCase()}
+              {myPhoto ? <img src={myPhoto} alt="" referrerPolicy="no-referrer" /> : (user?.name?.charAt(0) || "W").toUpperCase()}
             </div>
             <span className="compose-row__text">Ada yang ingin dibagikan?</span>
             <button className="primary-button" type="button">Unggah</button>
@@ -910,7 +921,7 @@ function SettingsPanel({
   onInstall,
   canInstall,
 }: {
-  user: { name: string; email: string; avatar?: string } | null;
+  user: { id: string; name: string; email: string; avatar?: string } | null;
   isAdmin: boolean;
   canSignIn: boolean;
   onSignIn: () => void;
@@ -960,6 +971,7 @@ function SettingsPanel({
           )
         )}
       </div>
+      {user && <ProfileEditor user={user} />}
       <div className="settings-list">
         {canInstall && (
           <div>
@@ -1004,5 +1016,67 @@ function SettingsPanel({
         <span>Melihat koleksi tidak perlu login. Login Google hanya diperlukan untuk upload.</span>
       </div>
     </section>
+  );
+}
+
+function ProfileEditor({ user }: { user: { id: string; name: string; avatar?: string } }) {
+  const profiles = useProfiles();
+  const p = profiles[user.id];
+  const [name, setName] = useState(user.name);
+  const [bio, setBio] = useState("");
+  const [photo, setPhoto] = useState<string | undefined>(user.avatar);
+  const [crop, setCrop] = useState<File | null>(null);
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!p) return;
+    setName(p.name || user.name);
+    setBio(p.bio || "");
+    setPhoto(p.photo || user.avatar);
+  }, [p?.name, p?.bio, p?.photo]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const save = async () => {
+    setBusy(true);
+    setMsg("");
+    try {
+      await saveProfile(user.id, { name: name.trim() || user.name, bio: bio.trim(), ...(photo ? { photo } : {}) });
+      setMsg("Profil tersimpan. Foto dan nama baru tampil di semua unggahanmu.");
+    } catch (e: any) {
+      setMsg(`Gagal: ${e?.message || "coba lagi"}`);
+    }
+    setBusy(false);
+  };
+
+  return (
+    <div className="profile-edit">
+      <label className="profile-edit__photo">
+        <span className="avatar avatar--lime avatar--large">
+          {photo ? <img src={photo} alt="" referrerPolicy="no-referrer" /> : (name.charAt(0) || "W").toUpperCase()}
+        </span>
+        <span>Ganti foto</span>
+        <input
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={e => { setCrop(e.target.files?.[0] || null); e.target.value = ""; }}
+        />
+      </label>
+      <div className="profile-edit__fields">
+        <label>
+          <span>Nama pengguna</span>
+          <input value={name} onChange={e => setName(e.target.value)} maxLength={30} />
+        </label>
+        <label>
+          <span>Bio</span>
+          <input value={bio} onChange={e => setBio(e.target.value)} maxLength={80} placeholder="Tulis singkat tentang kamu" />
+        </label>
+        <button className="primary-button" onClick={save} disabled={busy}>
+          {busy ? "Menyimpan…" : "Simpan profil"}
+        </button>
+        {msg && <p className="muted-note">{msg}</p>}
+      </div>
+      {crop && <Cropper file={crop} round outW={400} onCancel={() => setCrop(null)} onDone={d => { setPhoto(d); setCrop(null); }} />}
+    </div>
   );
 }
