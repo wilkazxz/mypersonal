@@ -63,8 +63,8 @@ function applyManifest(s: Site) {
       scope: `${location.origin}/`,
       display: "standalone",
       orientation: "any",
-      background_color: "#f6f6f1",
-      theme_color: "#d7ff00",
+      background_color: "#f4faff",
+      theme_color: "#e3f3ff",
       icons,
     };
     const url = URL.createObjectURL(new Blob([JSON.stringify(manifest)], { type: "application/manifest+json" }));
