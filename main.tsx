@@ -8,6 +8,9 @@ try {
   /* abaikan */
 }
 
+document.addEventListener("gesturestart", e => e.preventDefault());
+document.addEventListener("touchmove", e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+
 createRoot(document.getElementById("root")!).render(<React.StrictMode><App /></React.StrictMode>);
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
