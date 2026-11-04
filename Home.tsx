@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type MouseEvent } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth, authEnabled } from "./auth";
 import { useInstall, detectPlatform } from "./pwa";
@@ -46,6 +46,10 @@ import {
   ArrowUpDown,
   ShieldCheck,
   User,
+  MessageCircle,
+  Repeat2,
+  Link2,
+  Send,
 } from "lucide-react";
 
 type NavItem = {
@@ -167,89 +171,21 @@ function Logo() {
   );
 }
 
-function MediaCard({
-  item,
-  onFavorite,
-  onDelete,
-  canDelete = true,
-}: {
-  item: MediaItem;
-  onFavorite: (id: number) => void;
-  onDelete: (id: number) => void;
-  canDelete?: boolean;
-}) {
+function MediaCard({ item, onFavorite, onLike, onRepost, onOpen, onDelete, canDelete, currentUserId }: { item: MediaItem; onFavorite: (id: number) => void; onLike: (id: number) => void; onRepost: (item: MediaItem) => void; onOpen: (item: MediaItem) => void; onDelete: (id: number) => void; canDelete?: boolean; currentUserId?: string }) {
   const profiles = useProfiles();
   const prof = item.ownerId ? profiles[item.ownerId] : undefined;
   const ownerName = prof?.name || item.ownerName || "Pengguna";
-  return (
-    <article className={`media-card media-card--${item.ratio}`}>
-      <div className="post-head">
-        <span className="avatar avatar--lime">
-          {prof?.photo ? <img src={prof.photo} alt="" referrerPolicy="no-referrer" /> : ownerName.charAt(0).toUpperCase()}
-        </span>
-        <strong>{ownerName}</strong>
-        <span className="post-head__time">{item.date}</span>
-      </div>
-      <div className="media-card__visual">
-        {item.image ? (
-          <img src={item.image} alt={item.title} loading="lazy" />
-        ) : (
-          <div className="media-card__file-placeholder">
-            <FileText size={32} />
-            <span>{item.kind.toUpperCase()}</span>
-          </div>
-        )}
-        <div className="media-card__shade" />
-        {item.kind === "video" && (
-          <span className="play-badge">
-            <Play size={13} fill="currentColor" />
-          </span>
-        )}
-        <button
-          className={`favorite-button ${item.favorite ? "is-favorite" : ""}`}
-          onClick={() => onFavorite(item.id)}
-          aria-label={
-            item.favorite ? "Hapus dari favorit" : "Tambah ke favorit"
-          }
-        >
-          <Heart size={16} fill={item.favorite ? "currentColor" : "none"} />
-        </button>
-        <span className="media-card__kind">{ID[item.category] || item.category}</span>
-      </div>
-      <div className="media-card__body">
-        <div className="media-card__copy">
-          <h3>{item.title}</h3>
-          <p>{item.subtitle}</p>
-        </div>
-        {item.link && (
-          <a
-            className="icon-button icon-button--small"
-            href={item.link}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={`Buka ${item.title}`}
-          >
-            <ExternalLink size={16} />
-          </a>
-        )}
-        {canDelete && (
-          <button
-            className="icon-button icon-button--small"
-            onClick={() => {
-              if (window.confirm(`Hapus "${item.title}"?`)) onDelete(item.id);
-            }}
-            aria-label={`Hapus ${item.title}`}
-          >
-            <Trash2 size={16} />
-          </button>
-        )}
-      </div>
-      <div className="media-card__meta">
-        <span>{item.date}</span>
-        <span>{item.size}</span>
-      </div>
-    </article>
-  );
+  const liked = !!currentUserId && (item.likedBy || []).includes(currentUserId);
+  const share = async (e: MouseEvent) => { e.stopPropagation(); const url = `${window.location.origin}/p/${item.id}`; try { if (navigator.share) await navigator.share({ title: item.title, text: item.text || item.subtitle, url }); else await navigator.clipboard.writeText(url); } catch { /* dibatalkan */ } };
+  return <article className={`media-card media-card--${item.ratio}`} onClick={() => onOpen(item)}>
+    {item.repostOf && <div className="repost-label"><Repeat2 size={14} /> Repost</div>}
+    <div className="post-head"><Link href={item.ownerId ? `/u/${encodeURIComponent(ownerName)}` : "#"} onClick={e => e.stopPropagation()} className="avatar avatar--lime">{prof?.photo ? <img src={prof.photo} alt="" referrerPolicy="no-referrer" /> : ownerName.charAt(0).toUpperCase()}</Link><strong>{ownerName}</strong><span className="post-head__time">{item.date}</span></div>
+    {(item.text || item.subtitle) && <div className="post-text">{item.text || item.subtitle}</div>}
+    {(item.image || item.images?.length) && <div className="media-card__visual"><img src={item.image || item.images?.[0]} alt={item.title} loading="lazy" />{item.images && item.images.length > 1 && <span className="carousel-count">1 / {item.images.length}</span>} {item.kind === "video" && <span className="play-badge"><Play size={13} fill="currentColor" /></span>}<span className="media-card__kind">{ID[item.category] || item.category}</span></div>}
+    {!item.image && !item.images?.length && !item.text && <div className="media-card__file-placeholder"><FileText size={32} /><span>{item.kind.toUpperCase()}</span></div>}
+    <div className="media-card__body"><div className="media-card__copy"><h3>{item.title}</h3><p>{item.tags.map(t => `#${t}`).join(" ")}</p></div>{item.link && <a className="icon-button icon-button--small" href={item.link} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} aria-label={`Buka ${item.title}`}><ExternalLink size={16} /></a>}{canDelete && <button className="icon-button icon-button--small" onClick={e => { e.stopPropagation(); if (window.confirm(`Hapus "${item.title}"?`)) onDelete(item.id); }} aria-label={`Hapus ${item.title}`}><Trash2 size={16} /></button>}</div>
+    <div className="post-actions"><button className={liked ? "is-liked" : ""} onClick={e => { e.stopPropagation(); onLike(item.id); }}><Heart size={17} fill={liked ? "currentColor" : "none"} /> {item.likes || 0}</button><button onClick={e => { e.stopPropagation(); onOpen(item); }}><MessageCircle size={17} /> {item.comments?.length || 0}</button><button onClick={e => { e.stopPropagation(); onRepost(item); }}><Repeat2 size={17} /></button><button onClick={share}><Link2 size={17} /></button><button className={item.favorite ? "is-saved" : ""} onClick={e => { e.stopPropagation(); onFavorite(item.id); }}><Star size={17} fill={item.favorite ? "currentColor" : "none"} /></button></div>
+  </article>;
 }
 
 async function fileToDataUrl(file: File) {
@@ -261,157 +197,15 @@ async function fileToDataUrl(file: File) {
   });
 }
 
-function UploadPanel({
-  onClose,
-  onUpload,
-}: {
-  onClose: () => void;
-  onUpload: (item: MediaItem) => void;
-}) {
-  const [file, setFile] = useState<File | null>(null);
-  const [fileName, setFileName] = useState("");
-  const [title, setTitle] = useState("");
-  const [category, setCategory] = useState("Photos");
-  const [tags, setTags] = useState("");
-  const [saved, setSaved] = useState(false);
-
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (!file) return;
-    const nextTitle =
-      title.trim() || fileName || "Tanpa judul";
-    onUpload({
-      id: Date.now(),
-      title: nextTitle,
-      subtitle: fileName
-        ? `Berkas · ${fileName}`
-        : "Unggahan baru",
-      category,
-      kind:
-        category === "Videos"
-          ? "video"
-          : category === "Projects"
-            ? "project"
-            : category === "Websites"
-              ? "website"
-              : category === "Documents"
-                ? "document"
-                : "photo",
-      tags: tags
-        .split(",")
-        .map(tag => tag.trim())
-        .filter(Boolean),
-      image: file && file.type.startsWith("image/")
-        ? await fileToDataUrl(file)
-        : undefined,
-      date: "Just now",
-      size: file ? formatBytes(file.size) : "",
-      sizeBytes: file?.size ?? 0,
-      favorite: false,
-      ratio: "landscape",
-    });
-    setSaved(true);
-    window.setTimeout(onClose, 650);
-  };
-
-  return (
-    <div
-      className="modal-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="upload-title"
-    >
-      <div className="upload-panel">
-        <div className="panel-topline">
-          <span className="eyebrow">UNGGAH</span>
-          <button
-            className="icon-button"
-            onClick={onClose}
-            aria-label="Tutup"
-          >
-            <X size={18} />
-          </button>
-        </div>
-        <h2 id="upload-title">
-          Bagikan sesuatu
-          <br />
-          <span>yang baru.</span>
-        </h2>
-        <p className="panel-intro">
-          Pilih foto dari galeri kamu, beri judul, lalu bagikan.
-        </p>
-        <form onSubmit={submit}>
-          <label className="dropzone">
-            <input
-              type="file"
-              accept="image/*"
-              onChange={event => {
-                const selected = event.target.files?.[0] || null;
-                setFile(selected);
-                setFileName(selected?.name || "");
-              }}
-            />
-            <span className="dropzone__icon">
-              <Upload size={19} />
-            </span>
-            <strong>{fileName || "Pilih foto / cover"}</strong>
-            <small>JPG, PNG, atau WebP. Ukuran diperkecil otomatis.</small>
-          </label>
-          <div className="form-grid">
-            <label>
-              <span>Judul</span>
-              <input
-                value={title}
-                onChange={event => setTitle(event.target.value)}
-                placeholder="Beri judul"
-              />
-            </label>
-            <label>
-              <span>Kategori</span>
-              <select
-                value={category}
-                onChange={event => setCategory(event.target.value)}
-              >
-                <option value="Photos">Foto</option>
-                <option value="Videos">Video</option>
-                <option value="Projects">Proyek</option>
-                <option value="Websites">Situs</option>
-                <option value="Documents">Dokumen</option>
-              </select>
-            </label>
-          </div>
-          <label>
-            <span>Tag</span>
-            <input
-              value={tags}
-              onChange={event => setTags(event.target.value)}
-              placeholder="malam, referensi"
-            />
-          </label>
-          <button
-            className="primary-button primary-button--full"
-            type="submit"
-            disabled={!file || saved}
-          >
-            {saved ? (
-              <>
-                <Check size={17} /> Terunggah
-              </>
-            ) : (
-              <>
-                <Plus size={17} /> Unggah
-              </>
-            )}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
+function UploadPanel({ onClose, onUpload }: { onClose: () => void; onUpload: (item: MediaItem) => void }) {
+  const [files, setFiles] = useState<File[]>([]); const [title, setTitle] = useState(""); const [text, setText] = useState(""); const [category, setCategory] = useState("Photos"); const [tags, setTags] = useState(""); const [saved, setSaved] = useState(false);
+  const submit = async (event: FormEvent) => { event.preventDefault(); if (!files.length && !text.trim()) return; const images = await Promise.all(files.filter(f => f.type.startsWith("image/")).map(fileToDataUrl)); const first = files[0]; const kind = category === "Videos" ? "video" : category === "Projects" ? "project" : category === "Websites" ? "website" : category === "Documents" ? "document" : "photo"; onUpload({ id: Date.now(), title: title.trim() || (text.trim() ? "Post baru" : first?.name || "Tanpa judul"), subtitle: text.trim(), text: text.trim() || undefined, category, kind, tags: tags.split(",").map(t => t.trim()).filter(Boolean), image: images[0], images, date: "Baru saja", size: first ? formatBytes(first.size) : "", sizeBytes: first?.size ?? 0, favorite: false, ratio: "landscape" }); setSaved(true); window.setTimeout(onClose, 650); };
+  return <div className="modal-backdrop" role="dialog" aria-modal="true"><div className="upload-panel"><div className="panel-topline"><span className="eyebrow">POSTING BARU</span><button className="icon-button" onClick={onClose} aria-label="Tutup"><X size={18} /></button></div><h2>Bagikan sesuatu<br /><span>yang baru.</span></h2><p className="panel-intro">Tulis pesan, tambahkan foto, video, atau dokumen. Tidak wajib memilih berkas.</p><form onSubmit={submit}><label><span>Teks</span><textarea className="post-composer" value={text} onChange={e => setText(e.target.value)} placeholder="Apa yang sedang kamu pikirkan?" rows={4} /></label><label className="dropzone"><input type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.txt" onChange={e => setFiles(Array.from(e.target.files || []))} /><span className="dropzone__icon"><Upload size={19} /></span><strong>{files.length ? `${files.length} berkas dipilih` : "Tambah foto / video / dokumen"}</strong><small>Foto bisa dipilih lebih dari satu. Berkas opsional.</small></label><div className="form-grid"><label><span>Judul</span><input value={title} onChange={e => setTitle(e.target.value)} placeholder="Judul (opsional)" /></label><label><span>Kategori</span><select value={category} onChange={e => setCategory(e.target.value)}><option value="Photos">Foto</option><option value="Videos">Video</option><option value="Projects">Proyek</option><option value="Websites">Situs</option><option value="Documents">Dokumen</option></select></label></div><label><span>Tag</span><input value={tags} onChange={e => setTags(e.target.value)} placeholder="malam, referensi" /></label><button className="primary-button primary-button--full" type="submit" disabled={(!files.length && !text.trim()) || saved}>{saved ? <><Check size={17} /> Terkirim</> : <><Send size={17} /> Posting</>}</button></form></div></div>;
 }
 
 export default function Home() {
   const [location, navigate] = useLocation();
-  const { items, connected, addItem, toggleFavorite, deleteItem } =
+  const { items, connected, addItem, toggleFavorite, deleteItem, likeItem, addComment } =
     useRealtimeItems();
   const { user, isAdmin, loading: authLoading, signInWithGoogle, signOut } =
     useAuth();
@@ -425,6 +219,8 @@ export default function Home() {
   const [activeFilter, setActiveFilter] = useState("All items");
   const [uploadOpen, setUploadOpen] = useState(location === "/upload");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(20);
+  const [detail, setDetail] = useState<MediaItem | null>(null);
   const page = PAGE_META[location] || PAGE_META["/"];
   const photoCount = items.filter(item => item.category === "Photos").length;
   const videoCount = items.filter(item => item.category === "Videos").length;
@@ -459,10 +255,9 @@ export default function Home() {
       "/favorites": "Favorites",
     };
     const list = items.filter(item => {
-      const matchesRoute =
-        location === "/favorites"
-          ? item.favorite
-          : !routeFilter[location] || item.category === routeFilter[location];
+      const profileMatch = location.startsWith("/u/") ? decodeURIComponent(location.slice(3)).toLowerCase() : "";
+      const detailMatch = location.startsWith("/p/") ? Number(location.slice(3)) === item.id : true;
+      const matchesRoute = location === "/favorites" ? item.favorite : (profileMatch ? (item.ownerName || "").toLowerCase() === profileMatch : (!routeFilter[location] || item.category === routeFilter[location]));
       const matchesFilter =
         activeFilter === "All items" || item.category === activeFilter;
       const matchesSearch =
@@ -471,12 +266,14 @@ export default function Home() {
           .join(" ")
           .toLowerCase()
           .includes(normalizedSearch);
-      return matchesRoute && matchesFilter && matchesSearch;
+      return matchesRoute && detailMatch && matchesFilter && matchesSearch;
     });
     if (sortMode === "Terlama") return [...list].sort((a, b) => a.id - b.id);
     if (sortMode === "Judul A–Z") return [...list].sort((a, b) => a.title.localeCompare(b.title));
     return [...list].sort((a, b) => b.id - a.id);
   }, [activeFilter, items, location, search, sortMode]);
+
+  useEffect(() => { setVisibleCount(20); const found = location.startsWith("/p/") ? items.find(i => i.id === Number(location.slice(3))) : null; setDetail(found || null); }, [location, items]);
 
   const collections = useMemo(() => {
     const map = new Map<string, MediaItem[]>();
@@ -500,9 +297,10 @@ export default function Home() {
   const handleFavorite = (id: number) => {
     void toggleFavorite(id);
   };
-  const handleDelete = (id: number) => {
-    void deleteItem(id);
-  };
+  const handleDelete = (id: number) => { void deleteItem(id); };
+  const handleLike = (id: number) => { void likeItem(id, user?.id); };
+  const handleRepost = (item: MediaItem) => { if (!canUpload) { setLoginOpen(true); return; } void addItem({ ...item, id: Date.now(), title: `Repost: ${item.title}`, repostOf: item.id, date: "Baru saja", ownerId: undefined, ownerName: undefined, ownerEmail: undefined, favorite: false }); };
+  const handleOpen = (item: MediaItem) => { setDetail(item); navigate(`/p/${item.id}`); };
   const handleUpload = (item: MediaItem) => {
     addItem(item).catch(err =>
       window.alert(`Upload gagal: ${err?.message || "coba lagi"}`)
@@ -774,14 +572,8 @@ export default function Home() {
             </section>
             {pageItems.length ? (
               <div className="media-masonry">
-                {pageItems.map(item => (
-                  <MediaCard
-                    key={item.id}
-                    item={item}
-                    onFavorite={handleFavorite}
-                    onDelete={handleDelete}
-                    canDelete={!authEnabled || isAdmin || item.ownerId === user?.id}
-                  />
+                {pageItems.slice(0, visibleCount).map(item => (
+                  <MediaCard key={item.id} item={item} onFavorite={handleFavorite} onLike={handleLike} onRepost={handleRepost} onOpen={handleOpen} onDelete={handleDelete} canDelete={!authEnabled || isAdmin || item.ownerId === user?.id} currentUserId={user?.id} />
                 ))}
               </div>
             ) : (
@@ -794,6 +586,7 @@ export default function Home() {
                 </button>
               </div>
             )}
+            {pageItems.length > visibleCount && <button className="secondary-button load-more" onClick={() => setVisibleCount(n => n + 20)}>Muat lagi</button>}
           </>
         )}
       </main>
@@ -825,6 +618,7 @@ export default function Home() {
       {uploadOpen && canUpload && (
         <UploadPanel onClose={closeUpload} onUpload={handleUpload} />
       )}
+      {detail && <PostDetail item={detail} onClose={() => { setDetail(null); navigate("/"); }} onComment={text => void addComment(detail.id, text, { id: user?.id, name: user?.name })} />}
       {(loginOpen || (uploadOpen && !canUpload && !authLoading)) && (
         <LoginModal
           onClose={closeLogin}
@@ -840,6 +634,11 @@ export default function Home() {
       )}
     </div>
   );
+}
+
+function PostDetail({ item, onClose, onComment }: { item: MediaItem; onClose: () => void; onComment: (text: string) => void }) {
+  const [text, setText] = useState("");
+  return <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={onClose}><div className="post-detail" onClick={e => e.stopPropagation()}><div className="panel-topline"><span className="eyebrow">DETAIL POST</span><button className="icon-button" onClick={onClose}><X size={18} /></button></div>{item.image && <img className="post-detail__image" src={item.image} alt={item.title} /> }<h2>{item.title}</h2>{item.text && <p className="post-detail__text">{item.text}</p>}<div className="post-detail__tags">{item.tags.map(t => <span key={t}>#{t}</span>)}</div><div className="comments"><strong>{item.comments?.length || 0} komentar</strong>{(item.comments || []).map(c => <div className="comment" key={c.id}><b>{c.authorName}</b><span>{c.text}</span></div>)}<form onSubmit={e => { e.preventDefault(); if (text.trim()) { onComment(text); setText(""); } }}><input value={text} onChange={e => setText(e.target.value)} placeholder="Tulis komentar..." /><button className="primary-button" type="submit"><Send size={15} /></button></form></div></div></div>;
 }
 
 function LoginModal({

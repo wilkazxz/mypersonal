@@ -7,6 +7,7 @@ export type Site = {
   icon?: string; // 192px PNG (tab browser, logo, apple-touch-icon)
   icon512?: string; // 512px (ikon aplikasi terpasang)
   iconMask?: string; // 512px maskable (Android)
+  splash?: string; // layar pembuka aplikasi
 };
 export type RegisteredUser = {
   uid: string;
@@ -116,6 +117,7 @@ function start() {
         icon: d?.icon || undefined,
         icon512: d?.icon512 || undefined,
         iconMask: d?.iconMask || undefined,
+        splash: d?.splash || undefined,
       });
     },
     () => {}
@@ -187,13 +189,14 @@ export function useSite() {
     };
   }, []);
 
-  const save = useCallback(async (name: string, iconFile?: File | null) => {
+  const save = useCallback(async (name: string, iconFile?: File | null, splashFile?: File | null) => {
     if (!db) throw new Error("Firebase belum aktif");
     const data: Record<string, unknown> = {
       name: name.trim() || DEFAULT.name,
       updatedAt: Date.now(),
     };
     if (iconFile) Object.assign(data, await buildIcons(iconFile));
+    if (splashFile) { const reader = new FileReader(); const splash = await new Promise<string>((resolve, reject) => { reader.onload = () => resolve(String(reader.result)); reader.onerror = reject; reader.readAsDataURL(splashFile); }); if (splash.length > 900_000) throw new Error("Splash terlalu besar, pilih gambar yang lebih kecil."); data.splash = splash; }
     const total = JSON.stringify(data).length;
     if (total > 900_000) throw new Error("Ikon terlalu besar, pakai gambar yang lebih sederhana.");
     await setDoc(doc(db, "settings", "site"), data, { merge: true });

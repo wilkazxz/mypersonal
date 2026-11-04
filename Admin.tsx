@@ -106,10 +106,12 @@ export default function Admin() {
   const [siteName, setSiteName] = useState<string | null>(null);
   const [iconFile, setIconFile] = useState<File | null>(null);
   const [iconRaw, setIconRaw] = useState<File | null>(null);
+  const [splashFile, setSplashFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
 
   const iconPreview = useMemo(() => (iconFile ? URL.createObjectURL(iconFile) : ""), [iconFile]);
+  const splashPreview = useMemo(() => (splashFile ? URL.createObjectURL(splashFile) : site.splash || ""), [splashFile, site.splash]);
   const uploadsOf = (uid: string) => items.filter(i => i.ownerId === uid).length;
 
   const photos = items.filter(i => i.category === "Photos").length;
@@ -170,8 +172,9 @@ export default function Admin() {
     setSaving(true);
     setSavedMsg("");
     try {
-      await saveSite(siteName ?? site.name, iconFile);
+      await saveSite(siteName ?? site.name, iconFile, splashFile);
       setIconFile(null);
+      setSplashFile(null);
       setSiteName(null);
       setSavedMsg("Tersimpan. Langsung berubah di semua perangkat.");
     } catch (err: any) {
@@ -498,6 +501,13 @@ export default function Admin() {
                 </span>
                 <input type="file" accept="image/*" onChange={e => { setIconRaw(e.target.files?.[0] || null); e.target.value = ""; }} />
               </label>
+              <div className="splash-admin">
+                <span className="eyebrow">SPLASH SCREEN</span>
+                <strong>Foto pembuka aplikasi</strong>
+                <small>Ditampilkan sekali saat aplikasi dibuka di perangkat.</small>
+                {splashPreview && <img src={splashPreview} alt="Preview splash screen" />}
+                <label className="file-pick"><span><ImagePlus size={16} /> {splashFile ? splashFile.name : "Pilih foto splash"}</span><input type="file" accept="image/*" onChange={e => { setSplashFile(e.target.files?.[0] || null); e.target.value = ""; }} /></label>
+              </div>
               <div className="form-actions">
                 <button className="primary-button" disabled={saving} onClick={onSave}>
                   {saving ? "Menyimpan…" : "Simpan perubahan"}
