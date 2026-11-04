@@ -1,1 +1,0 @@
-{"buildCommand":"pnpm build:static","outputDirectory":"dist","installCommand":"pnpm install --no-frozen-lockfile","framework":"vite","rewrites":[{"source":"/(.*)","destination":"/index.html"}]}
