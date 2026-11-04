@@ -55,7 +55,8 @@ export function useRealtimeItems() {
       if (stamped.text) payload.text = stamped.text;
       if (stamped.repostOf) payload.repostOf = stamped.repostOf;
       if (stamped.link) payload.link = stamped.link;
-      await setDoc(doc(db, COL, String(stamped.id)), payload); }, [raw, channel]);
+      const safePayload = JSON.parse(JSON.stringify(payload));
+      await setDoc(doc(db, COL, String(stamped.id)), safePayload); }, [raw, channel]);
   const updateItem = useCallback(async (id: number, patch: Partial<MediaItem>) => { if (!db) return commitLocal(raw.map(i => i.id === id ? { ...i, ...patch } : i)); await updateDoc(doc(db, COL, String(id)), patch); }, [raw, channel]);
   const deleteItem = useCallback(async (id: number) => { if (!db) return commitLocal(raw.filter(i => i.id !== id)); await deleteDoc(doc(db, COL, String(id))); }, [raw, channel]);
   const toggleFavorite = useCallback(async (id: number) => { setFavs(prev => { const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]; localStorage.setItem(FAV_KEY, JSON.stringify(next)); return next; }); }, []);
