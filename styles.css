@@ -489,3 +489,19 @@ body { overscroll-behavior-y: none; }
   .admin-panel, .admin-metric { box-shadow: 0 4px 16px rgba(110,170,230,.10); backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
 @media (prefers-reduced-motion: reduce) { .admin-sidebar { transition: none; } }
+
+/* Threads-style inline composer */
+.thread-composer { display: flex; gap: 12px; margin: 0 16px 16px; padding: 16px; border: 1px solid var(--line); border-radius: 22px; background: rgba(255,255,255,.9); box-shadow: 0 5px 18px rgba(110,170,230,.10); }
+.thread-composer form { flex: 1; min-width: 0; }
+.thread-composer textarea { display: block; width: 100%; min-height: 70px; resize: vertical; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 16px; line-height: 1.45; }
+.thread-composer__bottom { display: flex; align-items: center; gap: 10px; border-top: 1px solid var(--line); padding-top: 10px; }
+.thread-composer__bottom .primary-button { height: 36px; padding: 0 16px; margin-left: auto; }
+.thread-attach { position: relative; display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; color: #4aa8ec; cursor: pointer; }
+.thread-attach:hover { background: var(--soft); }
+.thread-attach input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.thread-selected { color: var(--muted); font-size: 12px; }
+.video-frame { position: relative; width: 100%; background: #071522; }
+.video-frame video { display: block; width: 100%; max-height: 640px; object-fit: contain; }
+.video-sound { position: absolute; right: 12px; bottom: 12px; width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 50%; background: rgba(0,0,0,.68); color: #fff; }
+.video-sound:hover { background: rgba(0,0,0,.86); }
+@media (max-width: 760px) { .thread-composer { margin: 0 16px 12px; padding: 14px; } }
