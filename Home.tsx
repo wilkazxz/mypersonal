@@ -42,6 +42,7 @@ import {
   Share,
   ArrowUpDown,
   ShieldCheck,
+  User,
 } from "lucide-react";
 
 type NavItem = {
@@ -62,6 +63,7 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 const FILTERS = ["All items", "Photos", "Videos", "Projects", "Websites", "Documents"];
+const ID: Record<string, string> = { "All items": "Semua", Photos: "Foto", Videos: "Video", Projects: "Proyek", Websites: "Situs", Documents: "Dokumen" };
 const SORTS = ["Terbaru", "Terlama", "Judul A–Z"] as const;
 type SortMode = (typeof SORTS)[number];
 const CATEGORY_ROUTE: Record<string, string> = {
@@ -175,6 +177,11 @@ function MediaCard({
 }) {
   return (
     <article className={`media-card media-card--${item.ratio}`}>
+      <div className="post-head">
+        <span className="avatar avatar--lime">{(item.ownerName || "W").charAt(0).toUpperCase()}</span>
+        <strong>{item.ownerName || "Wilka"}</strong>
+        <span className="post-head__time">{item.date}</span>
+      </div>
       <div className="media-card__visual">
         {item.image ? (
           <img src={item.image} alt={item.title} loading="lazy" />
@@ -194,12 +201,12 @@ function MediaCard({
           className={`favorite-button ${item.favorite ? "is-favorite" : ""}`}
           onClick={() => onFavorite(item.id)}
           aria-label={
-            item.favorite ? "Remove from favorites" : "Add to favorites"
+            item.favorite ? "Hapus dari favorit" : "Tambah ke favorit"
           }
         >
           <Heart size={16} fill={item.favorite ? "currentColor" : "none"} />
         </button>
-        <span className="media-card__kind">{item.category}</span>
+        <span className="media-card__kind">{ID[item.category] || item.category}</span>
       </div>
       <div className="media-card__body">
         <div className="media-card__copy">
@@ -212,7 +219,7 @@ function MediaCard({
             href={item.link}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label={`Open ${item.title}`}
+            aria-label={`Buka ${item.title}`}
           >
             <ExternalLink size={16} />
           </a>
@@ -223,7 +230,7 @@ function MediaCard({
             onClick={() => {
               if (window.confirm(`Hapus "${item.title}"?`)) onDelete(item.id);
             }}
-            aria-label={`Delete ${item.title}`}
+            aria-label={`Hapus ${item.title}`}
           >
             <Trash2 size={16} />
           </button>
@@ -258,23 +265,19 @@ function UploadPanel({
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("Photos");
   const [tags, setTags] = useState("");
-  const [link, setLink] = useState("");
   const [saved, setSaved] = useState(false);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!file && !link.trim()) return;
-    const cleanLink = link.trim()
-      ? /^https?:\/\//i.test(link.trim()) ? link.trim() : `https://${link.trim()}`
-      : undefined;
+    if (!file) return;
     const nextTitle =
-      title.trim() || fileName || cleanLink?.replace(/^https?:\/\//i, "") || "Untitled upload";
+      title.trim() || fileName || "Tanpa judul";
     onUpload({
       id: Date.now(),
       title: nextTitle,
       subtitle: fileName
-        ? `Uploaded file · ${fileName}`
-        : "New collection item",
+        ? `Berkas · ${fileName}`
+        : "Unggahan baru",
       category,
       kind:
         category === "Videos"
@@ -290,12 +293,11 @@ function UploadPanel({
         .split(",")
         .map(tag => tag.trim())
         .filter(Boolean),
-      link: cleanLink,
       image: file && file.type.startsWith("image/")
         ? await fileToDataUrl(file)
         : undefined,
       date: "Just now",
-      size: file ? formatBytes(file.size) : "Link",
+      size: file ? formatBytes(file.size) : "",
       sizeBytes: file?.size ?? 0,
       favorite: false,
       ratio: "landscape",
@@ -313,23 +315,22 @@ function UploadPanel({
     >
       <div className="upload-panel">
         <div className="panel-topline">
-          <span className="eyebrow">UPLOAD CENTER</span>
+          <span className="eyebrow">UNGGAH</span>
           <button
             className="icon-button"
             onClick={onClose}
-            aria-label="Close upload panel"
+            aria-label="Tutup"
           >
             <X size={18} />
           </button>
         </div>
         <h2 id="upload-title">
-          Add something
+          Bagikan sesuatu
           <br />
-          <span>to the archive.</span>
+          <span>yang baru.</span>
         </h2>
         <p className="panel-intro">
-          Drop in a photo, a project, or a little piece of the internet. We’ll
-          keep the context with it.
+          Pilih foto dari galeri kamu, beri judul, lalu bagikan.
         </p>
         <form onSubmit={submit}>
           <label className="dropzone">
@@ -346,61 +347,51 @@ function UploadPanel({
               <Upload size={19} />
             </span>
             <strong>{fileName || "Pilih foto / cover"}</strong>
-            <small>JPG, PNG, WebP (diperkecil otomatis). Untuk video, website, atau project cukup isi link.</small>
+            <small>JPG, PNG, atau WebP. Ukuran diperkecil otomatis.</small>
           </label>
           <div className="form-grid">
             <label>
-              <span>Title</span>
+              <span>Judul</span>
               <input
                 value={title}
                 onChange={event => setTitle(event.target.value)}
-                placeholder="Give it a name"
+                placeholder="Beri judul"
               />
             </label>
             <label>
-              <span>Category</span>
+              <span>Kategori</span>
               <select
                 value={category}
                 onChange={event => setCategory(event.target.value)}
               >
-                <option>Photos</option>
-                <option>Videos</option>
-                <option>Projects</option>
-                <option>Websites</option>
-                <option>Documents</option>
+                <option value="Photos">Foto</option>
+                <option value="Videos">Video</option>
+                <option value="Projects">Proyek</option>
+                <option value="Websites">Situs</option>
+                <option value="Documents">Dokumen</option>
               </select>
             </label>
           </div>
           <label>
-            <span>Link (opsional)</span>
-            <input
-              type="url"
-              inputMode="url"
-              value={link}
-              onChange={event => setLink(event.target.value)}
-              placeholder="https://youtube.com/… atau situs/project kamu"
-            />
-          </label>
-          <label>
-            <span>Tags</span>
+            <span>Tag</span>
             <input
               value={tags}
               onChange={event => setTags(event.target.value)}
-              placeholder="night, visual, reference"
+              placeholder="malam, referensi"
             />
           </label>
           <button
             className="primary-button primary-button--full"
             type="submit"
-            disabled={(!file && !link.trim()) || saved}
+            disabled={!file || saved}
           >
             {saved ? (
               <>
-                <Check size={17} /> Added to collection
+                <Check size={17} /> Terunggah
               </>
             ) : (
               <>
-                <Plus size={17} /> Add to WILKAXYZ
+                <Plus size={17} /> Unggah
               </>
             )}
           </button>
@@ -551,14 +542,14 @@ export default function Home() {
             )}
           </div>
           <div>
-            <strong>{user?.name || (authEnabled ? "Guest" : "Wilka")}</strong>
+            <strong>{user?.name || (authEnabled ? "Tamu" : "Wilka")}</strong>
             <span>
               {user
                 ? isAdmin
                   ? "Admin"
                   : user.email
                 : authEnabled
-                  ? "Tap to sign in"
+                  ? "Ketuk untuk masuk"
                   : "Personal space"}
             </span>
           </div>
@@ -613,16 +604,6 @@ export default function Home() {
               <span>Install aplikasi</span>
             </button>
           )}
-          <div className="storage-mini">
-            <div className="storage-mini__top">
-              <span>Storage used</span>
-              <strong>{storagePercent}%</strong>
-            </div>
-            <div className="progress-track">
-              <span style={{ width: `${storagePercent}%` }} />
-            </div>
-            <small>{formatBytes(storageBytes)} of 10 GB</small>
-          </div>
         </div>
       </aside>
 
@@ -654,7 +635,7 @@ export default function Home() {
           <div className="topbar__actions">
             <button className="round-status">
               <span className="status-dot" />{" "}
-              {connected ? "Live sync active" : "Connecting…"}
+              {connected ? "Sinkron aktif" : "Menyambungkan…"}
             </button>
             {canInstall && (
               <button className="install-button" onClick={install}>
@@ -671,31 +652,15 @@ export default function Home() {
           </div>
         </header>
 
-        <section className="hero-section">
-          <div className="hero-copy">
-            <div className="eyebrow">{page.eyebrow}</div>
-            <h1>
-              {page.title.split("\n").map((line, index) => (
-                <span key={line}>
-                  {line}
-                  {index < page.title.split("\n").length - 1 && <br />}
-                </span>
-              ))}
-            </h1>
-            <p>{page.description}</p>
-          </div>
-          <div className="hero-actions">
-            <button
-              className="secondary-button"
-              onClick={() => navigate("/collections")}
-            >
-              <Sparkles size={16} /> Curate space
-            </button>
-            <button className="primary-button" onClick={openUpload}>
-              <Upload size={16} /> Upload new
-            </button>
-          </div>
-        </section>
+        {location !== "/settings" && location !== "/collections" && (
+          <section className="compose-row" onClick={openUpload}>
+            <div className="avatar avatar--lime">
+              {user?.avatar ? <img src={user.avatar} alt="" referrerPolicy="no-referrer" /> : (user?.name?.charAt(0) || "W").toUpperCase()}
+            </div>
+            <span className="compose-row__text">Ada yang ingin dibagikan?</span>
+            <button className="primary-button" type="button">Unggah</button>
+          </section>
+        )}
 
         {location === "/collections" ? (
           <section className="collections-grid">
@@ -729,36 +694,6 @@ export default function Home() {
           <SettingsPanel user={user} isAdmin={isAdmin} canSignIn={authEnabled} onSignIn={() => setLoginOpen(true)} onSignOut={() => void signOut()} onInstall={install} canInstall={canInstall} />
         ) : (
           <>
-            <section className="quick-stats">
-              <div>
-                <span>COLLECTIONS</span>
-                <strong>{items.length ? 1 : 0}</strong>
-                <small>
-                  {items.length
-                    ? "Personal archive"
-                    : "Create after first upload"}
-                </small>
-              </div>
-              <div>
-                <span>STORED ITEMS</span>
-                <strong>{items.length}</strong>
-                <small>
-                  {items.length ? "Your uploaded files" : "No files yet"}
-                </small>
-              </div>
-              <div>
-                <span>PHOTOS / VIDEOS</span>
-                <strong>{photoCount + videoCount}</strong>
-                <small>
-                  {videoCount} videos · {photoCount} photos
-                </small>
-              </div>
-              <div>
-                <span>STORAGE</span>
-                <strong>{formatBytes(storageBytes)}</strong>
-                <small>of 10 GB available</small>
-              </div>
-            </section>
             <section className="library-toolbar">
               <div className="filter-tabs">
                 {FILTERS.map(filter => (
@@ -767,7 +702,7 @@ export default function Home() {
                     className={activeFilter === filter ? "is-active" : ""}
                     onClick={() => setActiveFilter(filter)}
                   >
-                    {filter}
+                    {ID[filter] || filter}
                   </button>
                 ))}
               </div>
@@ -776,25 +711,24 @@ export default function Home() {
                 <input
                   value={search}
                   onChange={event => setSearch(event.target.value)}
-                  placeholder="Search your archive"
+                  placeholder="Cari unggahan"
                 />
               </div>
             </section>
             {location === "/" && (
               <section className="feature-strip feature-strip--empty">
                 <div className="feature-strip__copy">
-                  <span className="eyebrow">YOUR PRIVATE ARCHIVE</span>
+                  <span className="eyebrow">MULAI DI SINI</span>
                   <h2>
-                    Ready for the
+                    Belum ada
                     <br />
-                    <span>first signal.</span>
+                    <span>unggahan.</span>
                   </h2>
                   <p>
-                    No files are stored yet. Upload something personal and your
-                    collection will start here.
+                    Jadilah yang pertama membagikan sesuatu.
                   </p>
                   <button className="primary-button" onClick={openUpload}>
-                    <Upload size={15} /> Upload first file
+                    <Upload size={15} /> Unggah pertama
                   </button>
                 </div>
                 <div className="feature-strip__visual">
@@ -813,11 +747,10 @@ export default function Home() {
             <section className="section-heading">
               <div>
                 <span className="eyebrow">
-                  {location === "/" ? "RECENTLY UPLOADED" : "YOUR COLLECTION"}
+                  {location === "/" ? "TERBARU" : "UNGGAHAN"}
                 </span>
                 <h2>
-                  {pageItems.length} {pageItems.length === 1 ? "item" : "items"}{" "}
-                  in view
+                  {pageItems.length} unggahan
                 </h2>
               </div>
               <button
@@ -843,10 +776,10 @@ export default function Home() {
             ) : (
               <div className="empty-state">
                 <Search size={24} />
-                <h3>No signal found</h3>
-                <p>Try another search or add something new to the archive.</p>
+                <h3>Belum ada hasil</h3>
+                <p>Coba kata kunci lain atau unggah sesuatu yang baru.</p>
                 <button className="primary-button" onClick={openUpload}>
-                  <Upload size={16} /> Upload new
+                  <Upload size={16} /> Unggah
                 </button>
               </div>
             )}
@@ -856,20 +789,20 @@ export default function Home() {
 
       <nav className="mobile-dock" aria-label="Main">
         {[
-          { href: "/", label: "Home", Icon: Compass },
-          { href: "/gallery", label: "Gallery", Icon: Grid2X2 },
+          { href: "/", label: "Beranda", Icon: Compass },
+          { href: "/search", label: "Cari", Icon: Search },
         ].map(({ href, label, Icon }) => (
           <Link key={href} href={href} aria-label={label} className={location === href ? "is-active" : ""}>
             <Icon size={20} />
             <span>{label}</span>
           </Link>
         ))}
-        <button className="dock-add" onClick={openUpload} aria-label="Upload new">
+        <button className="dock-add" onClick={openUpload} aria-label="Unggah">
           <Plus size={22} />
         </button>
         {[
-          { href: "/favorites", label: "Saved", Icon: Heart },
-          { href: "/settings", label: "More", Icon: Settings },
+          { href: "/favorites", label: "Tersimpan", Icon: Heart },
+          { href: "/settings", label: "Profil", Icon: User },
         ].map(({ href, label, Icon }) => (
           <Link key={href} href={href} aria-label={label} className={location === href ? "is-active" : ""}>
             <Icon size={20} />
