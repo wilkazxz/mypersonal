@@ -175,6 +175,8 @@ function Logo() {
   );
 }
 
+function SupportDev({ qr, onClose }: { qr: string; onClose: () => void }) { return <div className="support-qr-backdrop" role="dialog" aria-modal="true" onClick={onClose}><div className="support-qr-card" onClick={e => e.stopPropagation()}><button className="icon-button" onClick={onClose} aria-label="Tutup"><X size={18} /></button><h2>Support Dev</h2><p>Scan QR ini untuk dukungan.</p><img src={qr} alt="QR pembayaran donasi" /></div></div>; }
+
 function AutoVideo({ src, title }: { src: string; title: string }) {
   const ref = useRef<HTMLVideoElement>(null); const [muted, setMuted] = useState(true);
   useEffect(() => { const el = ref.current; if (!el) return; const observer = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { void el.play().catch(() => {}); } else { el.pause(); } }, { threshold: .55 }); observer.observe(el); return () => observer.disconnect(); }, []);
@@ -221,6 +223,8 @@ export default function Home() {
     useAuth();
   const { canInstall, install, helpOpen, closeHelp } = useInstall();
   const profiles = useProfiles();
+  const { site } = useSite();
+  const [supportOpen, setSupportOpen] = useState(false);
   const myPhoto = user ? profiles[user.id]?.photo || user.avatar : undefined;
   const [sortMode, setSortMode] = useState<SortMode>("Terbaru");
   const [loginOpen, setLoginOpen] = useState(false);
@@ -594,6 +598,8 @@ export default function Home() {
         )}
       </main>
 
+      {site.supportQr && <button className="support-dev-button" onClick={() => setSupportOpen(true)} aria-label="Support Dev">Support Dev</button>}
+      {supportOpen && site.supportQr && <SupportDev qr={site.supportQr} onClose={() => setSupportOpen(false)} />}
       <nav className="mobile-dock" aria-label="Main">
         {[
           { href: "/", label: "Beranda", Icon: Compass },

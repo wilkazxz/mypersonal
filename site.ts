@@ -8,6 +8,7 @@ export type Site = {
   icon512?: string; // 512px (ikon aplikasi terpasang)
   iconMask?: string; // 512px maskable (Android)
   splash?: string; // layar pembuka aplikasi
+  supportQr?: string; // QR donasi Support Dev
 };
 export type RegisteredUser = {
   uid: string;
@@ -118,6 +119,7 @@ function start() {
         icon512: d?.icon512 || undefined,
         iconMask: d?.iconMask || undefined,
         splash: d?.splash || undefined,
+        supportQr: d?.supportQr || undefined,
       });
     },
     () => {}
@@ -189,7 +191,7 @@ export function useSite() {
     };
   }, []);
 
-  const save = useCallback(async (name: string, iconFile?: File | null, splashFile?: File | null) => {
+  const save = useCallback(async (name: string, iconFile?: File | null, splashFile?: File | null, supportQrFile?: File | null) => {
     if (!db) throw new Error("Firebase belum aktif");
     const data: Record<string, unknown> = {
       name: name.trim() || DEFAULT.name,
@@ -197,6 +199,7 @@ export function useSite() {
     };
     if (iconFile) Object.assign(data, await buildIcons(iconFile));
     if (splashFile) { const reader = new FileReader(); const splash = await new Promise<string>((resolve, reject) => { reader.onload = () => resolve(String(reader.result)); reader.onerror = reject; reader.readAsDataURL(splashFile); }); if (splash.length > 900_000) throw new Error("Splash terlalu besar, pilih gambar yang lebih kecil."); data.splash = splash; }
+    if (supportQrFile) { const reader = new FileReader(); const qr = await new Promise<string>((resolve, reject) => { reader.onload = () => resolve(String(reader.result)); reader.onerror = reject; reader.readAsDataURL(supportQrFile); }); if (qr.length > 700_000) throw new Error("QR terlalu besar, pilih gambar yang lebih kecil."); data.supportQr = qr; }
     const total = JSON.stringify(data).length;
     if (total > 900_000) throw new Error("Ikon terlalu besar, pakai gambar yang lebih sederhana.");
     await setDoc(doc(db, "settings", "site"), data, { merge: true });
