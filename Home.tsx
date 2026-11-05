@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth, authEnabled } from "./auth";
 import { useInstall, detectPlatform } from "./pwa";
@@ -26,6 +26,8 @@ import {
   LayoutDashboard,
   Menu,
   MoreHorizontal,
+  Smile,
+  Music2,
   Play,
   Plus,
   Search,
@@ -50,6 +52,8 @@ import {
   Repeat2,
   Link2,
   Send,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 
 type NavItem = {
@@ -171,6 +175,12 @@ function Logo() {
   );
 }
 
+function AutoVideo({ src, title }: { src: string; title: string }) {
+  const ref = useRef<HTMLVideoElement>(null); const [muted, setMuted] = useState(true);
+  useEffect(() => { const el = ref.current; if (!el) return; const observer = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { void el.play().catch(() => {}); } else { el.pause(); } }, { threshold: .55 }); observer.observe(el); return () => observer.disconnect(); }, []);
+  return <div className="video-frame"><video ref={ref} src={src} title={title} muted={muted} loop playsInline preload="metadata" /><button className="video-sound" onClick={e => { e.stopPropagation(); setMuted(v => !v); }} aria-label={muted ? "Nyalakan suara" : "Matikan suara"}>{muted ? <VolumeX size={17} /> : <Volume2 size={17} />}</button></div>;
+}
+
 function MediaCard({ item, onFavorite, onLike, onRepost, onOpen, onDelete, canDelete, currentUserId }: { item: MediaItem; onFavorite: (id: number) => void; onLike: (id: number) => void; onRepost: (item: MediaItem) => void; onOpen: (item: MediaItem) => void; onDelete: (id: number) => void; canDelete?: boolean; currentUserId?: string }) {
   const profiles = useProfiles();
   const prof = item.ownerId ? profiles[item.ownerId] : undefined;
@@ -181,7 +191,7 @@ function MediaCard({ item, onFavorite, onLike, onRepost, onOpen, onDelete, canDe
     {item.repostOf && <div className="repost-label"><Repeat2 size={14} /> Repost</div>}
     <div className="post-head"><Link href={item.ownerId ? `/u/${encodeURIComponent(ownerName)}` : "#"} onClick={e => e.stopPropagation()} className="avatar avatar--lime">{prof?.photo ? <img src={prof.photo} alt="" referrerPolicy="no-referrer" /> : ownerName.charAt(0).toUpperCase()}</Link><strong>{ownerName}</strong><span className="post-head__time">{item.date}</span></div>
     {(item.text || item.subtitle) && <div className="post-text">{item.text || item.subtitle}</div>}
-    {(item.image || item.images?.length) && <div className="media-card__visual"><img src={item.image || item.images?.[0]} alt={item.title} loading="lazy" />{item.images && item.images.length > 1 && <span className="carousel-count">1 / {item.images.length}</span>} {item.kind === "video" && <span className="play-badge"><Play size={13} fill="currentColor" /></span>}<span className="media-card__kind">{ID[item.category] || item.category}</span></div>}
+    {(item.video || item.image || item.images?.length) && <div className="media-card__visual">{item.video ? <AutoVideo src={item.video} title={item.title} /> : <img src={item.image || item.images?.[0]} alt={item.title} loading="lazy" />}{item.images && item.images.length > 1 && <span className="carousel-count">1 / {item.images.length}</span>}<span className="media-card__kind">{ID[item.category] || item.category}</span></div>}
     {!item.image && !item.images?.length && !item.text && <div className="media-card__file-placeholder"><FileText size={32} /><span>{item.kind.toUpperCase()}</span></div>}
     <div className="media-card__body"><div className="media-card__copy"><h3>{item.title}</h3><p>{item.tags.map(t => `#${t}`).join(" ")}</p></div>{item.link && <a className="icon-button icon-button--small" href={item.link} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} aria-label={`Buka ${item.title}`}><ExternalLink size={16} /></a>}{canDelete && <button className="icon-button icon-button--small" onClick={e => { e.stopPropagation(); if (window.confirm(`Hapus "${item.title}"?`)) onDelete(item.id); }} aria-label={`Hapus ${item.title}`}><Trash2 size={16} /></button>}</div>
     <div className="post-actions"><button className={liked ? "is-liked" : ""} onClick={e => { e.stopPropagation(); onLike(item.id); }}><Heart size={17} fill={liked ? "currentColor" : "none"} /> {item.likes || 0}</button><button onClick={e => { e.stopPropagation(); onOpen(item); }}><MessageCircle size={17} /> {item.comments?.length || 0}</button><button onClick={e => { e.stopPropagation(); onRepost(item); }}><Repeat2 size={17} /></button><button onClick={share}><Link2 size={17} /></button><button className={item.favorite ? "is-saved" : ""} onClick={e => { e.stopPropagation(); onFavorite(item.id); }}><Star size={17} fill={item.favorite ? "currentColor" : "none"} /></button></div>
@@ -197,10 +207,10 @@ async function fileToDataUrl(file: File) {
   });
 }
 
-function UploadPanel({ onClose, onUpload }: { onClose: () => void; onUpload: (item: MediaItem) => void }) {
-  const [files, setFiles] = useState<File[]>([]); const [title, setTitle] = useState(""); const [text, setText] = useState(""); const [category, setCategory] = useState("Photos"); const [tags, setTags] = useState(""); const [saved, setSaved] = useState(false);
-  const submit = async (event: FormEvent) => { event.preventDefault(); if (!files.length && !text.trim()) return; const images = await Promise.all(files.filter(f => f.type.startsWith("image/")).map(fileToDataUrl)); const first = files[0]; const kind = category === "Videos" ? "video" : category === "Projects" ? "project" : category === "Websites" ? "website" : category === "Documents" ? "document" : "photo"; onUpload({ id: Date.now(), title: title.trim() || (text.trim() ? "Post baru" : "Post foto"), subtitle: text.trim(), text: text.trim() || undefined, category, kind, tags: tags.split(",").map(t => t.trim()).filter(Boolean), image: images[0], images, date: "Baru saja", size: first ? formatBytes(first.size) : "", sizeBytes: first?.size ?? 0, favorite: false, ratio: "landscape" }); setSaved(true); window.setTimeout(onClose, 650); };
-  return <div className="modal-backdrop" role="dialog" aria-modal="true"><div className="upload-panel"><div className="panel-topline"><span className="eyebrow">POSTING BARU</span><button className="icon-button" onClick={onClose} aria-label="Tutup"><X size={18} /></button></div><h2>Bagikan sesuatu<br /><span>yang baru.</span></h2><p className="panel-intro">Tulis pesan, tambahkan foto, video, atau dokumen. Tidak wajib memilih berkas.</p><form onSubmit={submit}><label><span>Teks</span><textarea className="post-composer" value={text} onChange={e => setText(e.target.value)} placeholder="Apa yang sedang kamu pikirkan?" rows={4} /></label><label className="dropzone"><input type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.txt" onChange={e => setFiles(Array.from(e.target.files || []))} /><span className="dropzone__icon"><Upload size={19} /></span><strong>{files.length ? `${files.length} berkas dipilih` : "Tambah foto / video / dokumen"}</strong><small>Foto bisa dipilih lebih dari satu. Berkas opsional.</small></label><div className="form-grid"><label><span>Judul</span><input value={title} onChange={e => setTitle(e.target.value)} placeholder="Judul (opsional)" /></label><label><span>Kategori</span><select value={category} onChange={e => setCategory(e.target.value)}><option value="Photos">Foto</option><option value="Videos">Video</option><option value="Projects">Proyek</option><option value="Websites">Situs</option><option value="Documents">Dokumen</option></select></label></div><label><span>Tag</span><input value={tags} onChange={e => setTags(e.target.value)} placeholder="malam, referensi" /></label><button className="primary-button primary-button--full" type="submit" disabled={(!files.length && !text.trim()) || saved}>{saved ? <><Check size={17} /> Terkirim</> : <><Send size={17} /> Posting</>}</button></form></div></div>;
+function UploadPanel({ onClose, onUpload, userName, userPhoto }: { onClose: () => void; onUpload: (item: MediaItem) => void; userName: string; userPhoto?: string }) {
+  const [files, setFiles] = useState<File[]>([]); const [text, setText] = useState(""); const [sending, setSending] = useState(false);
+  const submit = async (event: FormEvent) => { event.preventDefault(); if ((!files.length && !text.trim()) || sending) return; setSending(true); try { const images = await Promise.all(files.filter(f => f.type.startsWith("image/")).map(fileToDataUrl)); const videoFile = files.find(f => f.type.startsWith("video/")); const video = videoFile ? await fileToDataUrl(videoFile) : undefined; const first = files[0]; onUpload({ id: Date.now(), title: text.trim() ? "Post baru" : video ? "Video baru" : "Post foto", subtitle: text.trim(), text: text.trim() || undefined, category: video ? "Videos" : "Photos", kind: video ? "video" : "photo", tags: [], image: images[0], images, video, date: "Baru saja", size: first ? formatBytes(first.size) : "", sizeBytes: first?.size ?? 0, favorite: false, ratio: "landscape" }); setText(""); setFiles([]); onClose(); } catch (error) { window.alert(`Upload gagal: ${error instanceof Error ? error.message : "coba lagi"}`); } finally { setSending(false); } };
+  return <div className="new-thread-screen" role="dialog" aria-modal="true"><header className="new-thread-header"><button className="new-thread-close" onClick={onClose} aria-label="Tutup"><X size={30} strokeWidth={1.8} /></button><strong>New thread</strong><button className="new-thread-more" aria-label="Opsi lainnya"><MoreHorizontal size={25} /></button></header><form className="new-thread-form" onSubmit={submit}><div className="new-thread-identity"><div className="avatar avatar--lime">{userPhoto ? <img src={userPhoto} alt="" referrerPolicy="no-referrer" /> : userName.charAt(0).toUpperCase()}</div><div className="new-thread-author"><strong>{userName}</strong><button type="button" className="thread-tag">›&nbsp; Tag</button></div></div><textarea autoFocus value={text} onChange={e => setText(e.target.value)} placeholder="What's new?" aria-label="Isi postingan" />{files.length > 0 && <div className="new-thread-previews">{files.map(file => <div className="new-thread-preview" key={`${file.name}-${file.lastModified}`}>{file.type.startsWith("video/") ? <Video size={24} /> : <img src={URL.createObjectURL(file)} alt="Preview" />}</div>)}</div>}<div className="new-thread-tools"><label className="new-thread-tool" aria-label="Tambah foto"><ImageIcon size={27} /><input type="file" accept="image/*" multiple onChange={e => setFiles(Array.from(e.target.files || []))} /></label><label className="new-thread-tool" aria-label="Tambah video"><Video size={27} /><input type="file" accept="video/*" onChange={e => setFiles(Array.from(e.target.files || []))} /></label><button type="button" className="new-thread-tool" aria-label="Tambah GIF"><span className="gif-icon">GIF</span></button><button type="button" className="new-thread-tool" aria-label="Tambah musik"><Music2 size={27} /></button><button type="button" className="new-thread-tool" aria-label="Tambah emoji"><Smile size={27} /></button></div><button type="button" className="add-to-thread"><div className="avatar avatar--lime avatar--tiny">{userName.charAt(0).toUpperCase()}</div><span>Add to thread</span></button><div className="new-thread-bottom"><button type="button" className="new-thread-bottom-icon"><Plus size={26} /></button><button type="button" className="new-thread-bottom-icon"><Smile size={25} /></button><button className="new-thread-post" type="submit" disabled={(!files.length && !text.trim()) || sending}>{sending ? "Posting…" : "Post"}</button></div></form></div>;
 }
 
 export default function Home() {
@@ -461,15 +471,8 @@ export default function Home() {
           </div>
         </header>
 
-        {location !== "/settings" && location !== "/collections" && (
-          <section className="compose-row" onClick={openUpload}>
-            <div className="avatar avatar--lime">
-              {myPhoto ? <img src={myPhoto} alt="" referrerPolicy="no-referrer" /> : (user?.name?.charAt(0) || "W").toUpperCase()}
-            </div>
-            <span className="compose-row__text">Ada yang ingin dibagikan?</span>
-            <button className="primary-button" type="button">Unggah</button>
-          </section>
-        )}
+        {location !== "/settings" && location !== "/collections" && canUpload && !uploadOpen && <section className="compose-row" onClick={openUpload}><div className="avatar avatar--lime">{myPhoto ? <img src={myPhoto} alt="" referrerPolicy="no-referrer" /> : (user?.name?.charAt(0) || "W").toUpperCase()}</div><span className="compose-row__text">Ada yang ingin dibagikan?</span><button className="primary-button" type="button">Unggah</button></section>}
+        {uploadOpen && canUpload && <UploadPanel onClose={closeUpload} onUpload={handleUpload} userName={user?.name || "Wilkaxyz"} userPhoto={myPhoto} />}
 
         {location === "/collections" ? (
           <section className="collections-grid">
@@ -615,9 +618,6 @@ export default function Home() {
         ))}
       </nav>
       {helpOpen && <InstallHelp onClose={closeHelp} />}
-      {uploadOpen && canUpload && (
-        <UploadPanel onClose={closeUpload} onUpload={handleUpload} />
-      )}
       {detail && <PostDetail item={detail} onClose={() => { setDetail(null); navigate("/"); }} onComment={text => void addComment(detail.id, text, { id: user?.id, name: user?.name })} />}
       {(loginOpen || (uploadOpen && !canUpload && !authLoading)) && (
         <LoginModal
