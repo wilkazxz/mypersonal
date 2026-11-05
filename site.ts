@@ -140,6 +140,21 @@ function loadImage(file: File): Promise<HTMLImageElement> {
   });
 }
 
+function hasAlpha(img: HTMLImageElement): boolean {
+  try {
+    const c = document.createElement("canvas");
+    c.width = c.height = 64;
+    const ctx = c.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return false;
+    ctx.drawImage(img, 0, 0, 64, 64);
+    const d = ctx.getImageData(0, 0, 64, 64).data;
+    for (let i = 3; i < d.length; i += 4) if (d[i] < 250) return true;
+  } catch {
+    /* abaikan */
+  }
+  return false;
+}
+
 function draw(img: HTMLImageElement, size: number, pad: number, bg?: string): string {
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = size;
@@ -174,8 +189,9 @@ async function buildIcons(file: File) {
   const img = await loadImage(file);
   const icon = draw(img, 192, 0);
   const icon512 = await toWebp(draw(img, 512, 0), 512);
-  // maskable: ikon diperkecil 80% di atas latar putih agar aman dipotong bulat/squircle
-  const iconMask = await toWebp(draw(img, 512, 0.1, "#ffffff"), 512);
+  // Ikon transparan dipakai apa adanya (tanpa latar). Versi maskable butuh latar,
+  // jadi hanya dibuat untuk ikon yang tidak transparan.
+  const iconMask = hasAlpha(img) ? null : await toWebp(draw(img, 512, 0.1, "#ffffff"), 512);
   return { icon, icon512, iconMask };
 }
 
@@ -214,7 +230,19 @@ export function useSite() {
     );
   }, []);
 
-  return { site, save, resetIcon };
+  // Hapus satu aset kapan saja: ikon, splash, atau QR donasi
+  const removeAsset = useCallback(async (what: "icon" | "splash" | "supportQr") => {
+    if (!db) throw new Error("Firebase belum aktif");
+    const patch: Record<string, unknown> =
+      what === "icon"
+        ? { icon: null, icon512: null, iconMask: null }
+        : what === "splash"
+        ? { splash: null }
+        : { supportQr: null };
+    await setDoc(doc(db, "settings", "site"), { ...patch, updatedAt: Date.now() }, { merge: true });
+  }, []);
+
+  return { site, save, resetIcon, removeAsset };
 }
 
 export function useUsers(enabled: boolean) {

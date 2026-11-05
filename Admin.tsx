@@ -5,6 +5,7 @@ import { useSite, useUsers, type RegisteredUser } from "./site";
 import { useRealtimeItems } from "./realtime";
 import Cropper, { dataUrlToFile } from "./Cropper";
 import { SpotlightAdmin } from "./Spotlight";
+import { useSuccess } from "./UploadSuccess";
 import {
   ArrowLeft,
   Download,
@@ -18,7 +19,6 @@ import {
   LogOut,
   Pencil,
   Palette,
-  RotateCcw,
   Search,
   Trash2,
   Upload,
@@ -103,7 +103,8 @@ export default function Admin() {
   const [tab, setTab] = useState<Tab>("Overview");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { items, connected, deleteItem, updateItem } = useRealtimeItems();
-  const { site, save: saveSite, resetIcon } = useSite();
+  const { site, save: saveSite, removeAsset } = useSite();
+  const { show: showOk, node: okNode } = useSuccess();
   const { users, error: usersError, loading: usersLoading, removeUser } = useUsers(isAdmin);
   const [userQuery, setUserQuery] = useState("");
   const [siteName, setSiteName] = useState<string | null>(null);
@@ -177,12 +178,30 @@ export default function Admin() {
     setSaving(true);
     setSavedMsg("");
     try {
+      const what = iconFile ? "Ikon aplikasi" : splashFile ? "Splash screen" : supportQrFile ? "QR donasi" : "Nama aplikasi";
       await saveSite(siteName ?? site.name, iconFile, splashFile, supportQrFile);
       setIconFile(null);
       setSplashFile(null);
       setSupportQrFile(null);
       setSiteName(null);
       setSavedMsg("Tersimpan. Langsung berubah di semua perangkat.");
+      showOk(`${what} berhasil terupload`);
+    } catch (err: any) {
+      setSavedMsg(`Gagal: ${err?.message || "coba lagi"}`);
+    }
+    setSaving(false);
+  };
+
+  const onDelete = async (what: "icon" | "splash" | "supportQr", label: string) => {
+    if (!window.confirm(`Hapus ${label}?`)) return;
+    setSaving(true);
+    setSavedMsg("");
+    try {
+      await removeAsset(what);
+      if (what === "icon") setIconFile(null);
+      if (what === "splash") setSplashFile(null);
+      if (what === "supportQr") setSupportQrFile(null);
+      showOk(`${label} berhasil dihapus`, "del");
     } catch (err: any) {
       setSavedMsg(`Gagal: ${err?.message || "coba lagi"}`);
     }
@@ -191,6 +210,7 @@ export default function Admin() {
 
   return (
     <div className="admin-shell">
+      {okNode}
       <aside className={`admin-sidebar ${mobileMenuOpen ? "is-open" : ""}`}>
         <div className="admin-brand">
           {site.icon ? (
@@ -512,6 +532,11 @@ export default function Admin() {
                 <small>Ditampilkan sekali saat aplikasi dibuka di perangkat.</small>
                 {splashPreview && <img src={splashPreview} alt="Preview splash screen" />}
                 <label className="file-pick"><span><ImagePlus size={16} /> {splashFile ? splashFile.name : "Pilih foto splash"}</span><input type="file" accept="image/*" onChange={e => { setSplashFile(e.target.files?.[0] || null); e.target.value = ""; }} /></label>
+                {(site.splash || splashFile) && (
+                  <button className="danger-button" type="button" disabled={saving} onClick={() => (splashFile && !site.splash ? setSplashFile(null) : void onDelete("splash", "splash screen"))}>
+                    <Trash2 size={15} /> {splashFile && !site.splash ? "Batalkan pilihan" : "Hapus splash"}
+                  </button>
+                )}
               </div>
               <div className="support-dev-admin">
                 <span className="eyebrow">SUPPORT DEV</span>
@@ -519,26 +544,19 @@ export default function Admin() {
                 <small>Di web akan tampil sebagai tombol. Gambar QR baru muncul setelah tombol ditekan.</small>
                 {supportQrPreview && <img src={supportQrPreview} alt="Preview QR donasi" />}
                 <label className="file-pick"><span><ImagePlus size={16} /> {supportQrFile ? supportQrFile.name : "Pilih gambar QR pembayaran"}</span><input type="file" accept="image/*" onChange={e => { setSupportQrFile(e.target.files?.[0] || null); e.target.value = ""; }} /></label>
+                {(site.supportQr || supportQrFile) && (
+                  <button className="danger-button" type="button" disabled={saving} onClick={() => (supportQrFile && !site.supportQr ? setSupportQrFile(null) : void onDelete("supportQr", "QR donasi"))}>
+                    <Trash2 size={15} /> {supportQrFile && !site.supportQr ? "Batalkan pilihan" : "Hapus QR donasi"}
+                  </button>
+                )}
               </div>
               <div className="form-actions">
                 <button className="primary-button" disabled={saving} onClick={onSave}>
                   {saving ? "Menyimpan…" : "Simpan perubahan"}
                 </button>
                 {site.icon && (
-                  <button
-                    className="secondary-button"
-                    disabled={saving}
-                    onClick={async () => {
-                      if (!window.confirm("Kembalikan ke ikon bawaan?")) return;
-                      try {
-                        await resetIcon();
-                        setSavedMsg("Ikon dikembalikan ke bawaan.");
-                      } catch (err: any) {
-                        setSavedMsg(`Gagal: ${err?.message || "coba lagi"}`);
-                      }
-                    }}
-                  >
-                    <RotateCcw size={15} /> Reset ikon
+                  <button className="danger-button" type="button" disabled={saving} onClick={() => void onDelete("icon", "ikon aplikasi")}>
+                    <Trash2 size={15} /> Hapus ikon
                   </button>
                 )}
               </div>

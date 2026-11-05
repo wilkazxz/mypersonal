@@ -3,7 +3,8 @@ import { Link, useLocation } from "wouter";
 import { useAuth, authEnabled } from "./auth";
 import { useInstall, detectPlatform } from "./pwa";
 import { useSite } from "./site";
-import { useProfiles, saveProfile } from "./profiles";
+import { useProfiles, saveProfile, removeProfilePhoto } from "./profiles";
+import { useSuccess } from "./UploadSuccess";
 import Cropper from "./Cropper";
 import { SpotlightCarousel } from "./Spotlight";
 import type { LucideIcon } from "lucide-react";
@@ -225,7 +226,8 @@ export default function Home() {
   const profiles = useProfiles();
   const { site } = useSite();
   const [supportOpen, setSupportOpen] = useState(false);
-  const myPhoto = user ? profiles[user.id]?.photo || user.avatar : undefined;
+  const myPhoto = user ? (profiles[user.id]?.photo ?? user.avatar) : undefined;
+  const { show: showOk, node: okNode } = useSuccess();
   const [sortMode, setSortMode] = useState<SortMode>("Terbaru");
   const [loginOpen, setLoginOpen] = useState(false);
   const canUpload = !authEnabled || !!user;
@@ -316,9 +318,9 @@ export default function Home() {
   const handleRepost = (item: MediaItem) => { if (!canUpload) { setLoginOpen(true); return; } void addItem({ ...item, id: Date.now(), title: `Repost: ${item.title}`, repostOf: item.id, date: "Baru saja", ownerId: undefined, ownerName: undefined, ownerEmail: undefined, favorite: false }); };
   const handleOpen = (item: MediaItem) => { setDetail(item); navigate(`/p/${item.id}`); };
   const handleUpload = (item: MediaItem) => {
-    addItem(item).catch(err =>
-      window.alert(`Upload gagal: ${err?.message || "coba lagi"}`)
-    );
+    addItem(item)
+      .then(() => showOk("Berhasil terupload"))
+      .catch(err => window.alert(`Upload gagal: ${err?.message || "coba lagi"}`));
   };
   const openUpload = () => {
     setMobileNavOpen(false);
@@ -357,8 +359,8 @@ export default function Home() {
           onClick={() => (user || !authEnabled ? undefined : setLoginOpen(true))}
         >
           <div className="avatar avatar--lime">
-            {user?.avatar ? (
-              <img src={user.avatar} alt="" referrerPolicy="no-referrer" />
+            {myPhoto ? (
+              <img src={myPhoto} alt="" referrerPolicy="no-referrer" />
             ) : (
               (user?.name?.charAt(0) || (authEnabled ? "G" : "W")).toUpperCase()
             )}
@@ -466,8 +468,8 @@ export default function Home() {
               </button>
             )}
             <div className="avatar avatar--dark">
-              {user?.avatar ? (
-                <img src={user.avatar} alt="" referrerPolicy="no-referrer" />
+              {myPhoto ? (
+                <img src={myPhoto} alt="" referrerPolicy="no-referrer" />
               ) : (
                 (user?.name?.charAt(0) || "W").toUpperCase()
               )}
@@ -598,6 +600,7 @@ export default function Home() {
         )}
       </main>
 
+      {okNode}
       {site.supportQr && <button className="support-dev-button" onClick={() => setSupportOpen(true)} aria-label="Support Dev">Support Dev</button>}
       {supportOpen && site.supportQr && <SupportDev qr={site.supportQr} onClose={() => setSupportOpen(false)} />}
       <nav className="mobile-dock" aria-label="Main">
@@ -664,10 +667,10 @@ function LoginModal({
         </p>
         <button className="google-button" onClick={onGoogle}>
           <svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true">
-            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
-            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
-            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
-            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+            <path fill="#4aa8ec" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+            <path fill="#6cbcf2" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+            <path fill="#8ccbf8" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+            <path fill="#5ab3ee" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
           </svg>
           Lanjutkan dengan Google
         </button>
@@ -734,6 +737,8 @@ function SettingsPanel({
   onInstall: () => void;
   canInstall: boolean;
 }) {
+  const allProfiles = useProfiles();
+  const shownPhoto = user ? (allProfiles[user.id]?.photo ?? user.avatar) : undefined;
   const [compact, setCompact] = useState(() => {
     try {
       return localStorage.getItem("wilkaxyz:compact") === "1";
@@ -753,8 +758,8 @@ function SettingsPanel({
     <section className="settings-panel">
       <div className="settings-panel__intro">
         <div className="avatar avatar--lime avatar--large">
-          {user?.avatar ? (
-            <img src={user.avatar} alt="" referrerPolicy="no-referrer" />
+          {shownPhoto ? (
+            <img src={shownPhoto} alt="" referrerPolicy="no-referrer" />
           ) : (
             (user?.name?.charAt(0) || "G").toUpperCase()
           )}
@@ -830,6 +835,7 @@ function ProfileEditor({ user }: { user: { id: string; name: string; avatar?: st
   const [name, setName] = useState(user.name);
   const [bio, setBio] = useState("");
   const [photo, setPhoto] = useState<string | undefined>(user.avatar);
+  const { show: showOk, node: okNode } = useSuccess();
   const [crop, setCrop] = useState<File | null>(null);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
@@ -838,15 +844,30 @@ function ProfileEditor({ user }: { user: { id: string; name: string; avatar?: st
     if (!p) return;
     setName(p.name || user.name);
     setBio(p.bio || "");
-    setPhoto(p.photo || user.avatar);
+    setPhoto(p.photo ?? user.avatar);
   }, [p?.name, p?.bio, p?.photo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = async () => {
     setBusy(true);
     setMsg("");
     try {
-      await saveProfile(user.id, { name: name.trim() || user.name, bio: bio.trim(), ...(photo ? { photo } : {}) });
+      await saveProfile(user.id, { name: name.trim() || user.name, bio: bio.trim(), photo: photo || "" });
       setMsg("Profil tersimpan. Foto dan nama baru tampil di semua unggahanmu.");
+      showOk("Profil berhasil terupload");
+    } catch (e: any) {
+      setMsg(`Gagal: ${e?.message || "coba lagi"}`);
+    }
+    setBusy(false);
+  };
+
+  const deletePhoto = async () => {
+    if (!window.confirm("Hapus foto profil?")) return;
+    setBusy(true);
+    setMsg("");
+    try {
+      await removeProfilePhoto(user.id);
+      setPhoto("");
+      showOk("Foto profil berhasil dihapus", "del");
     } catch (e: any) {
       setMsg(`Gagal: ${e?.message || "coba lagi"}`);
     }
@@ -855,17 +876,23 @@ function ProfileEditor({ user }: { user: { id: string; name: string; avatar?: st
 
   return (
     <div className="profile-edit">
+      {okNode}
       <label className="profile-edit__photo">
         <span className="avatar avatar--lime avatar--large">
           {photo ? <img src={photo} alt="" referrerPolicy="no-referrer" /> : (name.charAt(0) || "W").toUpperCase()}
         </span>
-        <span>Ganti foto</span>
+        <span>{photo ? "Ganti foto" : "Upload foto"}</span>
         <input
           type="file"
           accept="image/*"
           hidden
           onChange={e => { setCrop(e.target.files?.[0] || null); e.target.value = ""; }}
         />
+        {photo && (
+          <button type="button" className="danger-button danger-button--small" disabled={busy} onClick={e => { e.preventDefault(); e.stopPropagation(); void deletePhoto(); }}>
+            <Trash2 size={13} /> Hapus foto
+          </button>
+        )}
       </label>
       <div className="profile-edit__fields">
         <label>
@@ -881,7 +908,7 @@ function ProfileEditor({ user }: { user: { id: string; name: string; avatar?: st
         </button>
         {msg && <p className="muted-note">{msg}</p>}
       </div>
-      {crop && <Cropper file={crop} round outW={400} onCancel={() => setCrop(null)} onDone={d => { setPhoto(d); setCrop(null); }} />}
+      {crop && <Cropper file={crop} round outW={400} maxLen={280000} onCancel={() => setCrop(null)} onDone={d => { setPhoto(d); setCrop(null); }} />}
     </div>
   );
 }

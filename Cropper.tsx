@@ -6,15 +6,16 @@ export function dataUrlToFile(d: string, name = "crop.jpg"): File {
   const bin = atob(b);
   const u = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
-  return new File([u], name, { type });
+  const ext = type.split("/")[1]?.replace("jpeg", "jpg") || "jpg";
+  return new File([u], name.replace(/\.[a-z0-9]+$/i, "") + "." + ext, { type });
 }
 
 type P = { x: number; y: number };
 
 export default function Cropper({
-  file, aspect = 1, round = false, outW = 512, quality = 0.85, onCancel, onDone,
+  file, aspect = 1, round = false, outW = 512, quality = 0.85, maxLen, onCancel, onDone,
 }: {
-  file: File; aspect?: number; round?: boolean; outW?: number; quality?: number;
+  file: File; aspect?: number; round?: boolean; outW?: number; quality?: number; maxLen?: number;
   onCancel: () => void; onDone: (dataUrl: string) => void;
 }) {
   const [img, setImg] = useState<HTMLImageElement | null>(null);
@@ -44,16 +45,43 @@ export default function Cropper({
   const left = img ? W / 2 + pos.x - (img.width * s) / 2 : 0;
   const top = img ? H / 2 + pos.y - (img.height * s) / 2 : 0;
 
+  // Render tanpa mengisi latar apa pun, jadi PNG/WebP transparan tetap transparan.
+  const render = (w: number) => {
+    if (!img) return "";
+    const h = Math.round(w / aspect);
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    const ctx = c.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return "";
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(img, -left / s, -top / s, W / s, H / s, 0, 0, w, h);
+    // cek apakah ada piksel transparan
+    let alpha = false;
+    try {
+      const d = ctx.getImageData(0, 0, w, h).data;
+      for (let i = 3; i < d.length; i += 16) if (d[i] < 250) { alpha = true; break; }
+    } catch { /* abaikan */ }
+    if (!alpha) {
+      // foto biasa: isi putih lalu JPEG (kecil)
+      const j = document.createElement("canvas");
+      j.width = w; j.height = h;
+      const jc = j.getContext("2d");
+      if (!jc) return "";
+      jc.fillStyle = "#fff"; jc.fillRect(0, 0, w, h);
+      jc.drawImage(c, 0, 0);
+      return j.toDataURL("image/jpeg", quality);
+    }
+    const webp = c.toDataURL("image/webp", 0.92);
+    return webp.startsWith("data:image/webp") ? webp : c.toDataURL("image/png");
+  };
+
   const done = () => {
     if (!img) return;
-    const outH = Math.round(outW / aspect);
-    const c = document.createElement("canvas");
-    c.width = outW; c.height = outH;
-    const ctx = c.getContext("2d");
-    if (!ctx) return;
-    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, outW, outH);
-    ctx.drawImage(img, -left / s, -top / s, W / s, H / s, 0, 0, outW, outH);
-    onDone(c.toDataURL("image/jpeg", quality));
+    let w = outW;
+    let out = render(w);
+    // perkecil bertahap bila melebihi batas ukuran Firestore
+    while (maxLen && out.length > maxLen && w > 96) { w = Math.round(w * 0.8); out = render(w); }
+    if (out) onDone(out);
   };
 
   return (

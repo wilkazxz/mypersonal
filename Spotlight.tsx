@@ -3,6 +3,7 @@ import { collection, deleteDoc, doc, onSnapshot, orderBy, query, setDoc } from "
 import { ImagePlus, Trash2 } from "lucide-react";
 import { db } from "./firebase";
 import Cropper from "./Cropper";
+import { useSuccess } from "./UploadSuccess";
 
 export type Slide = { id: string; image: string; title: string; caption: string; createdAt: number };
 
@@ -99,6 +100,7 @@ export function SpotlightAdmin() {
   const [caption, setCaption] = useState("");
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const { show: showOk, node: okNode } = useSuccess();
 
   const add = async () => {
     if (!db || !img) return;
@@ -110,6 +112,7 @@ export function SpotlightAdmin() {
       await setDoc(doc(db, "spotlight", String(now)), { image: img, title: title.trim(), caption: caption.trim(), createdAt: now });
       setImg(""); setTitle(""); setCaption("");
       setMsg("Spotlight ditambahkan. Langsung tampil di beranda.");
+      showOk("Spotlight berhasil terupload");
     } catch (e: any) {
       setMsg(`Gagal: ${e?.message || "coba lagi"}`);
     }
@@ -118,6 +121,7 @@ export function SpotlightAdmin() {
 
   return (
     <section className="admin-panel content-panel">
+      {okNode}
       <div className="admin-panel__head">
         <div>
           <span className="eyebrow">SPOTLIGHT</span>
@@ -156,7 +160,7 @@ export function SpotlightAdmin() {
             <button
               className="table-more"
               aria-label="Hapus slide"
-              onClick={() => { if (db && window.confirm("Hapus slide ini?")) void deleteDoc(doc(db, "spotlight", s.id)); }}
+              onClick={async () => { if (db && window.confirm("Hapus slide ini?")) { await deleteDoc(doc(db, "spotlight", s.id)); showOk("Slide berhasil dihapus", "del"); } }}
             >
               <Trash2 size={15} />
             </button>

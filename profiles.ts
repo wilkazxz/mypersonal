@@ -33,8 +33,14 @@ export function useProfiles() {
   return m;
 }
 
-export async function saveProfile(uid: string, data: { name: string; bio: string; photo?: string }) {
+export async function saveProfile(uid: string, data: { name: string; bio: string; photo?: string | null }) {
   if (!db) throw new Error("Firebase belum aktif");
   if (data.photo && data.photo.length > 300_000) throw new Error("Foto terlalu besar, coba crop lebih kecil.");
   await setDoc(doc(db, "profiles", uid), { uid, ...data, updatedAt: Date.now() }, { merge: true });
+}
+
+// Hapus foto profil: simpan string kosong supaya foto Google tidak muncul kembali
+export async function removeProfilePhoto(uid: string) {
+  if (!db) throw new Error("Firebase belum aktif");
+  await setDoc(doc(db, "profiles", uid), { uid, photo: "", updatedAt: Date.now() }, { merge: true });
 }
