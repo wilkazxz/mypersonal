@@ -30,11 +30,29 @@ service cloud.firestore {
         && request.resource.data.title.size() <= 200;
 
       // ubah/hapus: pemilik item atau admin
+      // pemilik/admin boleh ubah apa saja; user lain hanya boleh like & komentar
       allow update: if request.auth != null
-        && (resource.data.ownerId == request.auth.uid || isAdmin())
-        && request.resource.data.ownerId == resource.data.ownerId;
+        && request.resource.data.ownerId == resource.data.ownerId
+        && (resource.data.ownerId == request.auth.uid || isAdmin()
+            || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likedBy', 'comments']));
       allow delete: if request.auth != null
         && (resource.data.ownerId == request.auth.uid || isAdmin());
+    }
+
+    match /profiles/{uid} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    match /spotlight/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // token notifikasi push: hanya milik sendiri (server memakai Admin SDK)
+    match /push_tokens/{token} {
+      allow create, update: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow read, delete: if request.auth != null && resource.data.uid == request.auth.uid;
     }
   }
 }

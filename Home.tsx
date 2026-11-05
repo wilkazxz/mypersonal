@@ -5,6 +5,8 @@ import { useInstall, detectPlatform } from "./pwa";
 import { useSite } from "./site";
 import { useProfiles, saveProfile, removeProfilePhoto } from "./profiles";
 import { useSuccess } from "./UploadSuccess";
+import { NotificationSettings } from "./Notifications";
+import { sendNotify, unregisterPush } from "./push";
 import Cropper from "./Cropper";
 import { SpotlightCarousel } from "./Spotlight";
 import type { LucideIcon } from "lucide-react";
@@ -299,6 +301,11 @@ function UploadPanel({ onClose, onUpload, userName, userPhoto }: { onClose: () =
   );
 }
 
+async function doSignOut(signOut: () => Promise<void> | void) {
+  await unregisterPush().catch(() => {});
+  await signOut();
+}
+
 export default function Home() {
   const [location, navigate] = useLocation();
   const { items, connected, addItem, toggleFavorite, deleteItem, likeItem, addComment } =
@@ -398,12 +405,12 @@ export default function Home() {
     void toggleFavorite(id);
   };
   const handleDelete = (id: number) => { void deleteItem(id); };
-  const handleLike = (id: number) => { if (authEnabled && !user) { setLoginOpen(true); return; } void likeItem(id, user?.id); };
+  const handleLike = (id: number) => { if (authEnabled && !user) { setLoginOpen(true); return; } const was = !!user && !!items.find(i => i.id === id)?.likedBy?.includes(user.id); void likeItem(id, user?.id).then(() => { if (!was && user) void sendNotify({ type: "like", itemId: id }); }).catch(() => {}); };
   const handleRepost = (item: MediaItem) => { if (!canUpload) { setLoginOpen(true); return; } void addItem({ ...item, id: Date.now(), title: `Repost: ${item.title}`, repostOf: item.id, date: "Baru saja", ownerId: undefined, ownerName: undefined, ownerEmail: undefined, favorite: false }); };
   const handleOpen = (item: MediaItem) => { setDetail(item); navigate(`/p/${item.id}`); };
   const handleUpload = (item: MediaItem) => {
     addItem(item)
-      .then(() => showOk("Berhasil terupload"))
+      .then(() => { showOk("Berhasil terupload"); void sendNotify({ type: "post", itemId: item.id }); })
       .catch(err => window.alert(`Upload gagal: ${err?.message || "coba lagi"}`));
   };
   // handler stabil supaya kartu (memo) tidak dirender ulang saat scroll / state lain berubah
@@ -476,7 +483,7 @@ export default function Home() {
               className="icon-button"
               onClick={e => {
                 e.stopPropagation();
-                void signOut();
+                void doSignOut(signOut);
               }}
               aria-label="Sign out"
             >
@@ -603,7 +610,7 @@ export default function Home() {
             </button>
           </section>
         ) : location === "/settings" ? (
-          <SettingsPanel user={user} isAdmin={isAdmin} canSignIn={authEnabled} onSignIn={() => setLoginOpen(true)} onSignOut={() => void signOut()} onInstall={install} canInstall={canInstall} />
+          <SettingsPanel user={user} isAdmin={isAdmin} canSignIn={authEnabled} onSignIn={() => setLoginOpen(true)} onSignOut={() => void doSignOut(signOut)} onInstall={install} canInstall={canInstall} />
         ) : (
           <>
             <section className="library-toolbar">
@@ -721,7 +728,7 @@ export default function Home() {
         ))}
       </nav>
       {helpOpen && <InstallHelp onClose={closeHelp} />}
-      {detail && <PostDetail item={detail} onClose={() => { setDetail(null); navigate("/"); }} onComment={text => { if (authEnabled && !user) { setLoginOpen(true); return; } void addComment(detail.id, text, { id: user?.id, name: user?.name }); }} />}
+      {detail && <PostDetail item={detail} onClose={() => { setDetail(null); navigate("/"); }} onComment={text => { if (authEnabled && !user) { setLoginOpen(true); return; } const pid = detail.id; void addComment(pid, text, { id: user?.id, name: user?.name }).then(() => { void sendNotify({ type: "comment", itemId: pid }); }).catch(() => {}); }} />}
       {(loginOpen || (uploadOpen && !canUpload && !authLoading)) && (
         <LoginModal
           onClose={closeLogin}
@@ -876,6 +883,7 @@ function SettingsPanel({
         )}
       </div>
       {user && <ProfileEditor user={user} />}
+      {user && <NotificationSettings uid={user.id} />}
       <div className="settings-list">
         {canInstall && (
           <div>
