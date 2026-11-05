@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { collection, deleteDoc, doc, onSnapshot, orderBy, query, setDoc, updateDoc } from "firebase/firestore";
+import { collection, deleteDoc, doc, onSnapshot, orderBy, query, runTransaction, setDoc, updateDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
 
 export type MediaKind = "photo" | "video" | "project" | "website" | "document";
@@ -97,7 +97,20 @@ export function useRealtimeItems() {
   const updateItem = useCallback(async (id: number, patch: Partial<MediaItem>) => { if (!db) return commitLocal(raw.map(i => i.id === id ? { ...i, ...patch } : i)); await updateDoc(doc(db, COL, String(id)), patch); }, [raw, channel]);
   const deleteItem = useCallback(async (id: number) => { if (!db) return commitLocal(raw.filter(i => i.id !== id)); await deleteDoc(doc(db, COL, String(id))); }, [raw, channel]);
   const toggleFavorite = useCallback(async (id: number) => { setFavs(prev => { const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]; localStorage.setItem(FAV_KEY, JSON.stringify(next)); return next; }); }, []);
-  const likeItem = useCallback(async (id: number, uid?: string) => { const item = raw.find(i => i.id === id); if (!item) return; const key = uid || "guest"; const liked = (item.likedBy || []).includes(key); const likedBy = liked ? (item.likedBy || []).filter(x => x !== key) : [...(item.likedBy || []), key]; const patch = { likedBy, likes: likedBy.length }; if (!db) return commitLocal(raw.map(i => i.id === id ? { ...i, ...patch } : i)); await updateDoc(doc(db, COL, String(id)), patch); }, [raw, channel]);
-  const addComment = useCallback(async (id: number, text: string, author?: { id?: string; name?: string }) => { const item = raw.find(i => i.id === id); if (!item || !text.trim()) return; const comment: PostComment = { id: `${Date.now()}-${Math.random()}`, text: text.trim(), authorId: author?.id, authorName: author?.name || "Pengguna", createdAt: Date.now() }; const comments = [...(item.comments || []), comment]; if (!db) return commitLocal(raw.map(i => i.id === id ? { ...i, comments } : i)); await updateDoc(doc(db, COL, String(id)), { comments }); }, [raw, channel]);
+  // Like & komentar memakai transaksi supaya tidak saling menimpa saat banyak orang berinteraksi bersamaan
+  const likeItem = useCallback(async (id: number, uid?: string) => {
+    const key = uid || "guest";
+    const toggle = (likedBy: string[] = []) => { const next = likedBy.includes(key) ? likedBy.filter(x => x !== key) : [...likedBy, key]; return { likedBy: next, likes: next.length }; };
+    if (!db) { const item = raw.find(i => i.id === id); if (!item) return; const patch = toggle(item.likedBy); return commitLocal(raw.map(i => i.id === id ? { ...i, ...patch } : i)); }
+    const ref = doc(db, COL, String(id));
+    await runTransaction(db, async tx => { const snap = await tx.get(ref); if (!snap.exists()) return; tx.update(ref, toggle(snap.data().likedBy)); });
+  }, [raw, channel]);
+  const addComment = useCallback(async (id: number, text: string, author?: { id?: string; name?: string }) => {
+    const clean = text.trim().slice(0, 1000); if (!clean) return;
+    const comment: PostComment = { id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, text: clean, authorId: author?.id, authorName: author?.name || "Pengguna", createdAt: Date.now() };
+    if (!db) { const item = raw.find(i => i.id === id); if (!item) return; return commitLocal(raw.map(i => i.id === id ? { ...i, comments: [...(item.comments || []), comment] } : i)); }
+    const ref = doc(db, COL, String(id));
+    await runTransaction(db, async tx => { const snap = await tx.get(ref); if (!snap.exists()) return; tx.update(ref, { comments: [...(snap.data().comments || []), comment] }); });
+  }, [raw, channel]);
   return { items, connected, addItem, updateItem, toggleFavorite, deleteItem, likeItem, addComment };
 }

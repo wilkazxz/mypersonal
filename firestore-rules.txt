@@ -8,6 +8,17 @@ service cloud.firestore {
         && request.auth.token.email == 'wilkaaffah@gmail.com';
     }
 
+    // like/komentar oleh user lain: hanya field likes, likedBy, comments;
+    // likedBy hanya boleh berubah pada uid sendiri; komentar tidak boleh berkurang
+    function engagementOnly() {
+      let before = resource.data.get('likedBy', []).toSet();
+      let after = request.resource.data.get('likedBy', []).toSet();
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likedBy', 'comments'])
+        && request.resource.data.get('likes', 0) == after.size()
+        && after.difference(before).union(before.difference(after)).hasOnly([request.auth.uid])
+        && request.resource.data.get('comments', []).size() >= resource.data.get('comments', []).size();
+    }
+
     match /users/{uid} {
       allow read: if request.auth != null && (request.auth.uid == uid || isAdmin());
       allow create, update: if request.auth != null && request.auth.uid == uid;
@@ -29,12 +40,10 @@ service cloud.firestore {
         && request.resource.data.title is string
         && request.resource.data.title.size() <= 200;
 
-      // ubah/hapus: pemilik item atau admin
-      // pemilik/admin boleh ubah apa saja; user lain hanya boleh like & komentar
+      // pemilik/admin boleh ubah apa saja; user lain hanya boleh like (atas nama sendiri) & menambah komentar
       allow update: if request.auth != null
         && request.resource.data.ownerId == resource.data.ownerId
-        && (resource.data.ownerId == request.auth.uid || isAdmin()
-            || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likedBy', 'comments']));
+        && (resource.data.ownerId == request.auth.uid || isAdmin() || engagementOnly());
       allow delete: if request.auth != null
         && (resource.data.ownerId == request.auth.uid || isAdmin());
     }

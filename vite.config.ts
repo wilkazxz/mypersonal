@@ -23,10 +23,10 @@ function pwa(): Plugin {
       { src: "/icon-maskable.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
   };
-  const sw = `const C="wilkaxyz-v3";
+  const sw = `const C="wilkaxyz-v4";
 self.addEventListener("install",e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>c.add("/")))});
 self.addEventListener("activate",e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x!==C).map(x=>caches.delete(x)))).then(()=>self.clients.claim())));
-self.addEventListener("fetch",e=>{const r=e.request;if(r.method!=="GET"||new URL(r.url).origin!==location.origin)return;
+self.addEventListener("fetch",e=>{const r=e.request;if(r.method!=="GET"||new URL(r.url).origin!==location.origin||new URL(r.url).pathname.startsWith("/api/"))return;
 e.respondWith(fetch(r).then(res=>{if(res.ok){const cp=res.clone();caches.open(C).then(c=>c.put(r,cp))}return res}).catch(()=>caches.match(r).then(m=>m||caches.match("/"))))});
 self.addEventListener("push",e=>{let d={};try{const j=e.data.json();d=j.data||j.notification||j}catch(_){}
 e.waitUntil(self.registration.showNotification(d.title||"WILKAXYZ",{body:d.body||"",icon:"/icon-192.png",badge:"/icon-192.png",tag:d.tag||undefined,renotify:!!d.tag,data:{url:d.url||"/"}}))});
