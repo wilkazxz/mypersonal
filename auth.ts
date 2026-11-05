@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   GoogleAuthProvider,
+  getRedirectResult,
   onAuthStateChanged,
   signInWithPopup,
   signInWithRedirect,
@@ -35,6 +36,27 @@ async function registerUser(u: { uid: string; displayName: string | null; email:
   }
 }
 
+// Pesan error login yang jelas (sebagian besar masalah login ada di pengaturan Firebase Console, bukan di kode)
+function authErrorMessage(code?: string, fallback?: string) {
+  const host = typeof location !== "undefined" ? location.hostname : "";
+  switch (code) {
+    case "auth/unauthorized-domain":
+      return `Domain "${host}" belum diizinkan.\n\nFirebase Console > Authentication > Settings > Authorized domains > Add domain > isi: ${host}`;
+    case "auth/operation-not-allowed":
+      return "Login Google belum diaktifkan.\n\nFirebase Console > Authentication > Sign-in method > Google > Enable > Save.";
+    case "auth/network-request-failed":
+      return "Koneksi internet bermasalah. Coba lagi.";
+    case "auth/internal-error":
+    case "auth/invalid-api-key":
+    case "auth/api-key-not-valid.-please-pass-a-valid-api-key.":
+      return "Konfigurasi Firebase tidak valid (API key / authDomain). Periksa firebase.ts atau env VITE_FIREBASE_* di Vercel.";
+    case "auth/web-storage-unsupported":
+      return "Browser memblokir penyimpanan (cookie/storage). Matikan mode private atau izinkan cookie, lalu coba lagi.";
+    default:
+      return `Login gagal${code ? ` (${code})` : ""}: ${fallback || "coba lagi"}\n\nJika dibuka dari dalam aplikasi lain (Instagram, TikTok, dll), buka lewat Chrome / Safari.`;
+  }
+}
+
 // Harus sama dengan email di firestore.rules
 export const ADMIN_EMAILS = ["wilkaaffah@gmail.com"];
 
@@ -54,6 +76,7 @@ export function useAuth() {
 
   useEffect(() => {
     if (!auth) return;
+    getRedirectResult(auth).catch(e => window.alert(authErrorMessage(e?.code, e?.message)));
     return onAuthStateChanged(auth, u => {
       if (!u) {
         setUser(null);
@@ -92,7 +115,7 @@ export function useAuth() {
       if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") {
         return false;
       }
-      window.alert(`Login gagal: ${e?.message || "coba lagi"}`);
+      window.alert(authErrorMessage(code, e?.message));
       return false;
     }
   }, []);

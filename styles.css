@@ -439,6 +439,9 @@ body::after { width: 380px; height: 380px; top: -140px; right: -100px; backgroun
 /* Social/thread additions */
 .media-card { content-visibility: auto; contain-intrinsic-size: 420px; }
 .post-text { padding: 12px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15px; line-height: 1.55; }
+.post-text.is-clamped { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; line-clamp: 5; overflow: hidden; }
+.read-more { border: 0; background: none; padding: 4px 0 0; color: var(--blue, #2a8ae0); font-size: 13px; font-weight: 600; cursor: pointer; }
+.read-more:hover { text-decoration: underline; }
 .post-actions { display: flex; align-items: center; gap: 4px; padding: 10px 0 2px; border-top: 1px solid var(--line); margin-top: 10px; }
 .post-actions button { display: inline-flex; align-items: center; gap: 5px; border: 0; background: none; color: var(--muted); padding: 6px 8px; border-radius: 10px; font-size: 12px; }
 .post-actions button:hover { background: var(--soft); color: var(--ink); }

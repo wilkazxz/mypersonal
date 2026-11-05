@@ -1,9 +1,9 @@
 # WILKAXYZ
 
-Vite + React + Firebase. Semua file aplikasi di satu level supaya mudah di-upload lewat web GitHub. Satu-satunya folder: `api/` (fungsi server notifikasi, wajib bernama `api` agar dikenali Vercel).
+Vite + React + Firebase. Semua file di satu level (tanpa folder) supaya mudah di-upload lewat web GitHub.
 
 ## Upload ke GitHub
-Add file > Upload files > tarik semua file **termasuk folder `api/`** > Commit. (Jangan upload node_modules / dist.)
+Add file > Upload files > tarik semua file > Commit. (Jangan upload node_modules / dist.)
 
 ## Deploy ke Vercel
 Add New > Project > pilih repo. Framework Vite terdeteksi otomatis. Root Directory kosong. Deploy.
@@ -29,7 +29,8 @@ Tab: Overview, Konten, User (daftar user terdaftar + cari + ekspor CSV), Ikon & 
 2. Vercel > Settings > Environment Variables:
    - `VITE_FIREBASE_VAPID_KEY` = key pair di atas.
    - `FIREBASE_SERVICE_ACCOUNT` = isi file JSON service account (Project settings > Service accounts > Generate new private key), boleh versi base64.
-3. Deploy ulang. Fungsi server ada di `api/notify.js` (dipanggil dari `push.ts` ke `/api/notify`).
+3. Fungsi server: file `notify.js` di sini hanya penyimpanan. Agar aktif, di GitHub buat file baru bernama `api/notify.js` (Add file > Create new file, ketik `api/notify.js`) lalu tempel isi `notify.js`. Vercel hanya mengenali fungsi di folder `api`.
+4. Deploy ulang.
 Tanpa langkah ini, menu notifikasi otomatis tersembunyi.
 
 ## Catatan teknis

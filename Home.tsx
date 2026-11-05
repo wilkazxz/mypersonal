@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent } from "react";
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth, authEnabled } from "./auth";
 import { useInstall, detectPlatform } from "./pwa";
@@ -186,6 +186,27 @@ function AutoVideo({ src, title }: { src: string; title: string }) {
   return <div className="video-frame"><video ref={ref} src={src} title={title} muted={muted} loop playsInline preload="metadata" /><button className="video-sound" onClick={e => { e.stopPropagation(); setMuted(v => !v); }} aria-label={muted ? "Nyalakan suara" : "Matikan suara"}>{muted ? <VolumeX size={17} /> : <Volume2 size={17} />}</button></div>;
 }
 
+// Teks panjang dipotong beberapa baris; tombol "Selengkapnya" membuka semuanya (tanpa membuka detail postingan)
+function ExpandableText({ text }: { text: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [clamped, setClamped] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el && !open) setClamped(el.scrollHeight > el.clientHeight + 1);
+  }, [text, open]);
+  return (
+    <div className="post-text-wrap">
+      <div ref={ref} className={`post-text ${open ? "" : "is-clamped"}`}>{text}</div>
+      {(clamped || open) && (
+        <button type="button" className="read-more" onClick={e => { e.stopPropagation(); setOpen(v => !v); }}>
+          {open ? "Tutup" : "Selengkapnya"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 const MediaCard = memo(function MediaCard({ item, onFavorite, onLike, onRepost, onOpen, onDelete, canDelete, currentUserId }: { item: MediaItem; onFavorite: (id: number) => void; onLike: (id: number) => void; onRepost: (item: MediaItem) => void; onOpen: (item: MediaItem) => void; onDelete: (id: number) => void; canDelete?: boolean; currentUserId?: string }) {
   const profiles = useProfiles();
   const prof = item.ownerId ? profiles[item.ownerId] : undefined;
@@ -195,7 +216,7 @@ const MediaCard = memo(function MediaCard({ item, onFavorite, onLike, onRepost, 
   return <article className={`media-card media-card--${item.ratio}`} onClick={() => onOpen(item)}>
     {item.repostOf && <div className="repost-label"><Repeat2 size={14} /> Repost</div>}
     <div className="post-head"><Link href={item.ownerId ? `/u/${encodeURIComponent(ownerName)}` : "#"} onClick={e => e.stopPropagation()} className="avatar avatar--lime">{prof?.photo ? <img src={prof.photo} alt="" referrerPolicy="no-referrer" /> : ownerName.charAt(0).toUpperCase()}</Link><strong>{ownerName}</strong><span className="post-head__time">{item.date}</span></div>
-    {(item.text || item.subtitle) && <div className="post-text">{item.text || item.subtitle}</div>}
+    {(item.text || item.subtitle) && <ExpandableText text={item.text || item.subtitle} />}
     {(item.video || item.image || item.images?.length) && <div className="media-card__visual">{item.video ? <AutoVideo src={item.video} title={item.title} /> : <img src={item.image || item.images?.[0]} alt={item.title} loading="lazy" decoding="async" />}{item.images && item.images.length > 1 && <span className="carousel-count">1 / {item.images.length}</span>}<span className="media-card__kind">{ID[item.category] || item.category}</span></div>}
     {!item.image && !item.images?.length && !item.text && <div className="media-card__file-placeholder"><FileText size={32} /><span>{item.kind.toUpperCase()}</span></div>}
     <div className="media-card__body"><div className="media-card__copy"><h3>{item.title}</h3><p>{item.tags.map(t => `#${t}`).join(" ")}</p></div>{item.link && <a className="icon-button icon-button--small" href={item.link} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} aria-label={`Buka ${item.title}`}><ExternalLink size={16} /></a>}{canDelete && <button className="icon-button icon-button--small" onClick={e => { e.stopPropagation(); if (window.confirm(`Hapus "${item.title}"?`)) onDelete(item.id); }} aria-label={`Hapus ${item.title}`}><Trash2 size={16} /></button>}</div>
