@@ -648,3 +648,55 @@ body {
   .ok-card { animation: none !important; }
   .ok-ripple { display: none; }
 }
+
+/* =====================================================================
+   PERFORMA SCROLL — tanpa blur real-time di area yang ikut scroll,
+   background tidak "fixed", tiap kartu dirender terpisah (GPU friendly)
+   ===================================================================== */
+html { scroll-behavior: auto; overscroll-behavior-y: none; -webkit-overflow-scrolling: touch; }
+html, body, #root { background-color: #fff; }
+body {
+  background:
+    radial-gradient(700px 420px at 6% -6%, rgba(147,205,248,.5), transparent 70%),
+    radial-gradient(620px 400px at 100% -3%, rgba(205,235,255,.8), transparent 70%),
+    linear-gradient(180deg, #dff1ff 0%, #eef8ff 45%, #fff 100%);
+  background-size: 100% 900px; background-repeat: no-repeat; background-attachment: scroll;
+}
+body::before, body::after { display: none !important; }
+
+/* matikan backdrop-filter pada semua elemen yang ikut scroll */
+.media-card, .feature-strip, .empty-state, .settings-panel, .admin-panel, .admin-metric, .collection-card--new,
+.thread-composer, .compose-row, .library-toolbar, .search-control, .admin-search, .sidebar, .admin-sidebar,
+.secondary-button, .icon-button, .table-more, .sort-button, .mobile-topbar::before, .mobile-dock, .mobile-dock::before {
+  backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+}
+.media-card, .feature-strip, .empty-state, .settings-panel, .admin-panel, .admin-metric, .collection-card--new, .thread-composer, .compose-row {
+  background: linear-gradient(160deg, #ffffff, #eef7ff);
+  box-shadow: 0 2px 10px rgba(100,170,235,.12), inset 0 1px 0 #fff;
+}
+/* topbar & dock: gradasi biru -> putih yang lembut (tanpa blur & mask mahal) */
+.mobile-topbar { background: linear-gradient(180deg, #dff1ff 0%, rgba(223,241,255,.9) 70%, rgba(255,255,255,0)) !important; transform: translateZ(0); }
+.mobile-topbar::before { display: none !important; }
+.mobile-dock { background: linear-gradient(0deg, #eef8ff 0%, #f6fbff 100%) !important; border-top: 1px solid #d6eaf9 !important; transform: translateZ(0); will-change: transform; }
+@media (min-width: 900px) { .mobile-dock { border-top: 0 !important; border-right: 1px solid #d6eaf9 !important; } }
+.support-dev-button { transform: translateZ(0); }
+
+/* tiap kartu dirender terpisah supaya scroll tetap 60fps+ */
+.media-card { contain: layout paint style; content-visibility: auto; contain-intrinsic-size: auto 520px; }
+.media-card__visual img { transform: translateZ(0); }
+.spot__track { will-change: transform; }
+.spot { contain: layout paint; }
+.media-masonry { contain: none; }
+* { -webkit-tap-highlight-color: transparent; }
+.media-card, .primary-button, .secondary-button, .icon-button { transition: none; }
+.primary-button, .secondary-button, .danger-button { transition: transform .12s ease; }
+
+/* composer: lampiran, emoji */
+.preview-remove { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; display: grid; place-items: center; border: 0; border-radius: 50%; background: rgba(74,168,236,.92); color: #fff; padding: 0; }
+.new-thread-preview { position: relative; }
+.emoji-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; margin: 0 0 16px 58px; padding: 10px; border-radius: 16px; background: #eef7ff; border: 1px solid #d6eaf9; }
+.emoji-grid button { border: 0; background: transparent; font-size: 22px; line-height: 1; padding: 6px 0; border-radius: 10px; }
+.emoji-grid button:hover { background: #cdebff; }
+@media (max-width: 600px) { .emoji-grid { margin-left: 50px; grid-template-columns: repeat(6, 1fr); } }
+.thread-selected { color: #7a8fa3; font-size: 13px; }
+.new-thread-tool:hover, .new-thread-bottom-icon:hover { color: #4aa8ec; }

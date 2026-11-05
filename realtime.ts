@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { collection, deleteDoc, doc, onSnapshot, orderBy, query, setDoc, updateDoc } from "firebase/firestore";
 import { auth, db } from "./firebase";
 
@@ -6,7 +6,7 @@ export type MediaKind = "photo" | "video" | "project" | "website" | "document";
 export type PostComment = { id: string; text: string; authorId?: string; authorName: string; createdAt: number };
 export type MediaItem = {
   id: number; title: string; subtitle: string; category: string; kind: MediaKind; tags: string[];
-  image?: string; images?: string[]; date: string; size: string; sizeBytes?: number; favorite: boolean;
+  image?: string; images?: string[]; video?: string; date: string; size: string; sizeBytes?: number; favorite: boolean;
   ratio: "portrait" | "landscape" | "square"; link?: string; ownerId?: string; ownerName?: string; ownerEmail?: string;
   text?: string; repostOf?: number; likes?: number; likedBy?: string[]; comments?: PostComment[];
 };
@@ -19,7 +19,7 @@ const MAX_IMAGE_CHARS = 950_000;
 
 const fromDoc = (d: Record<string, any>): MediaItem => ({
   id: Number(d.id), title: d.title ?? "", subtitle: d.subtitle ?? "", category: d.category ?? "",
-  kind: (d.kind ?? "photo") as MediaKind, tags: d.tags ?? [], image: d.image ?? undefined, images: d.images ?? undefined,
+  kind: (d.kind ?? "photo") as MediaKind, tags: d.tags ?? [], image: d.image ?? undefined, images: d.images ?? undefined, video: d.video ?? undefined,
   text: d.text ?? undefined, repostOf: d.repostOf ?? undefined, date: d.date ?? "", size: d.size ?? "",
   sizeBytes: d.sizeBytes ?? undefined, favorite: false, ratio: d.ratio ?? "landscape", link: d.link ?? undefined,
   ownerId: d.ownerId ?? undefined, ownerName: d.ownerName ?? undefined, ownerEmail: d.ownerEmail ?? undefined,
@@ -27,9 +27,41 @@ const fromDoc = (d: Record<string, any>): MediaItem => ({
 });
 const today = () => new Date().toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 function shrink(src: string, max: number, quality: number): Promise<string> {
-  return new Promise(resolve => { const img = new Image(); img.onload = () => { const scale = Math.min(1, max / Math.max(img.width, img.height)); const w = Math.max(1, Math.round(img.width * scale)); const h = Math.max(1, Math.round(img.height * scale)); const canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h; const ctx = canvas.getContext("2d"); if (!ctx) return resolve(src); ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, w, h); ctx.drawImage(img, 0, 0, w, h); resolve(canvas.toDataURL("image/jpeg", quality)); }; img.onerror = () => resolve(src); img.src = src; });
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      const w = Math.max(1, Math.round(img.width * scale)); const h = Math.max(1, Math.round(img.height * scale));
+      const canvas = document.createElement("canvas"); canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) return resolve(src);
+      ctx.drawImage(img, 0, 0, w, h);
+      // gambar transparan (PNG/WebP hasil hapus background) TIDAK diberi latar putih
+      let alpha = false;
+      try { const d = ctx.getImageData(0, 0, w, h).data; for (let i = 3; i < d.length; i += 16) if (d[i] < 250) { alpha = true; break; } } catch { /* abaikan */ }
+      if (alpha) {
+        const webp = canvas.toDataURL("image/webp", quality);
+        return resolve(webp.startsWith("data:image/webp") ? webp : canvas.toDataURL("image/png"));
+      }
+      const flat = document.createElement("canvas"); flat.width = w; flat.height = h;
+      const fc = flat.getContext("2d"); if (!fc) return resolve(src);
+      fc.fillStyle = "#fff"; fc.fillRect(0, 0, w, h); fc.drawImage(canvas, 0, 0);
+      resolve(flat.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => resolve(src);
+    img.src = src;
+  });
 }
-async function prepareImage(src?: string) { if (!src || !src.startsWith("data:image")) return src; let out = await shrink(src, 1100, .78); if (out.length > MAX_IMAGE_CHARS) out = await shrink(src, 800, .6); if (out.length > MAX_IMAGE_CHARS) throw new Error("Gambar terlalu besar, pakai foto yang lebih kecil."); return out; }
+// budget = batas karakter per gambar (dokumen Firestore maks ~1 MB untuk semua gambar sekaligus)
+async function prepareImage(src: string | undefined, budget = MAX_IMAGE_CHARS) {
+  if (!src || !src.startsWith("data:image")) return src;
+  if (src.startsWith("data:image/gif") && src.length <= budget) return src; // GIF animasi dipertahankan
+  for (const [max, q] of [[1100, .8], [900, .7], [720, .6], [560, .5], [420, .45], [300, .4]] as const) {
+    const out = await shrink(src, max, q);
+    if (out.length <= budget) return out;
+  }
+  throw new Error("Gambar terlalu besar, pakai foto yang lebih kecil atau kurangi jumlah foto.");
+}
 function readLocal(): MediaItem[] { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]") as MediaItem[]; } catch { return []; } }
 function writeLocal(items: MediaItem[]) { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); }
 function readFavs(): number[] { try { return JSON.parse(localStorage.getItem(FAV_KEY) || "[]"); } catch { return []; } }
@@ -39,10 +71,14 @@ export function useRealtimeItems() {
   const [favs, setFavs] = useState<number[]>(() => typeof window === "undefined" ? [] : readFavs());
   const [connected, setConnected] = useState(!db);
   const channel = useMemo(() => !db && typeof window !== "undefined" && "BroadcastChannel" in window ? new BroadcastChannel(CHANNEL_NAME) : null, []);
-  useEffect(() => { if (db) return onSnapshot(query(collection(db, COL), orderBy("id", "desc")), snap => { setRaw(snap.docs.map(d => fromDoc(d.data()))); setConnected(true); }, () => setConnected(false)); const onStorage = (e: StorageEvent) => { if (e.key === STORAGE_KEY) setRaw(readLocal()); }; const onMessage = (e: MessageEvent<MediaItem[]>) => { if (Array.isArray(e.data)) setRaw(e.data); }; window.addEventListener("storage", onStorage); channel?.addEventListener("message", onMessage); return () => { window.removeEventListener("storage", onStorage); channel?.removeEventListener("message", onMessage); }; }, [channel]);
-  const items = useMemo(() => raw.map(item => ({ ...item, favorite: favs.includes(item.id) })), [raw, favs]);
+  const cache = useRef(new Map<string, MediaItem>());
+  useEffect(() => { if (db) return onSnapshot(query(collection(db, COL), orderBy("id", "desc")), snap => { const m = cache.current; snap.docChanges().forEach(ch => { if (ch.type === "removed") m.delete(ch.doc.id); else m.set(ch.doc.id, fromDoc(ch.doc.data())); }); setRaw(Array.from(m.values()).sort((a, b) => b.id - a.id)); setConnected(true); }, () => setConnected(false)); const onStorage = (e: StorageEvent) => { if (e.key === STORAGE_KEY) setRaw(readLocal()); }; const onMessage = (e: MessageEvent<MediaItem[]>) => { if (Array.isArray(e.data)) setRaw(e.data); }; window.addEventListener("storage", onStorage); channel?.addEventListener("message", onMessage); return () => { window.removeEventListener("storage", onStorage); channel?.removeEventListener("message", onMessage); }; }, [channel]);
+  const items = useMemo(() => { const f = new Set(favs); return raw.map(item => { const fav = f.has(item.id); return item.favorite === fav ? item : { ...item, favorite: fav }; }); }, [raw, favs]);
   const commitLocal = (next: MediaItem[]) => { setRaw(next); writeLocal(next); channel?.postMessage(next); };
-  const addItem = useCallback(async (item: MediaItem) => { const stamped = { ...item, date: today(), likes: item.likes ?? 0, comments: item.comments ?? [] }; if (!db) return commitLocal([stamped, ...raw]); const user = auth?.currentUser; if (!user) throw new Error("Login Google dulu untuk upload."); const images = await Promise.all((stamped.images?.length ? stamped.images : stamped.image ? [stamped.image] : []).map(prepareImage));
+  const addItem = useCallback(async (item: MediaItem) => { const stamped = { ...item, date: today(), likes: item.likes ?? 0, comments: item.comments ?? [] }; if (!db) return commitLocal([stamped, ...raw]); const user = auth?.currentUser; if (!user) throw new Error("Login Google dulu untuk upload."); const srcImages = stamped.images?.length ? stamped.images : stamped.image ? [stamped.image] : [];
+      if (stamped.video && stamped.video.length > 700_000) throw new Error("Video terlalu besar. Batas video sekitar 500 KB (penyimpanan Firestore tidak mendukung video besar).");
+      const budget = Math.floor((stamped.video ? 250_000 : 900_000) / Math.max(1, srcImages.length));
+      const images = await Promise.all(srcImages.map(src => prepareImage(src, budget)));
       const payload: Record<string, unknown> = {
         id: stamped.id, title: stamped.title, subtitle: stamped.subtitle ?? "", category: stamped.category ?? "",
         kind: stamped.kind, tags: stamped.tags ?? [], date: stamped.date, size: stamped.size ?? "",
@@ -52,6 +88,7 @@ export function useRealtimeItems() {
         createdAt: Date.now(),
       };
       if (images[0]) payload.image = images[0];
+      if (stamped.video) payload.video = stamped.video;
       if (stamped.text) payload.text = stamped.text;
       if (stamped.repostOf) payload.repostOf = stamped.repostOf;
       if (stamped.link) payload.link = stamped.link;
